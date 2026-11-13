@@ -3,10 +3,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fooddelivery.dto.MenuItemRequest;
 import com.fooddelivery.dto.MenuItemResponse;
 import com.fooddelivery.entity.MenuItem;
-import com.fooddelivery.entity.Restaurant;
+import com.fooddelivery.exception.ForbiddenException;
 import com.fooddelivery.exception.ResourceNotFoundException;
 import com.fooddelivery.repository.MenuItemRepository;
-import com.fooddelivery.repository.RestaurantRepository;
 import com.fooddelivery.service.MenuItemService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,23 +18,13 @@ import java.util.List;
 public class MenuItemServiceImpl implements MenuItemService {
 
     private final MenuItemRepository menuItemRepository;
-    private final RestaurantRepository restaurantRepository;
 
     @Override
     public MenuItemResponse create(MenuItemRequest request) {
-        Restaurant restaurant = restaurantRepository.findById(request.getRestaurantId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Restaurant not found with id: " + request.getRestaurantId()));
-
-        MenuItem item = MenuItem.builder()
-                .name(request.getName())
-                .description(request.getDescription())
-                .price(request.getPrice())
-                .available(true)
-                .restaurant(restaurant)
-                .build();
-
-        return toResponse(menuItemRepository.save(item));
+        // 旧 MenuItem 模块写接口暂时默认拒绝（403）。
+        // 原因：restaurantId 由客户端任意指定且无归属校验，任意登录用户可向他人餐厅注入菜单项；
+        // 系统当前没有可信的餐厅所有权授权体系。
+        throw new ForbiddenException("Menu item creation is temporarily disabled");
     }
 
     @Override
@@ -53,17 +42,18 @@ public class MenuItemServiceImpl implements MenuItemService {
 
     @Override
     public MenuItemResponse update(Long id, MenuItemRequest request) {
-        MenuItem item = findByIdOrThrow(id);
-        item.setName(request.getName());
-        item.setDescription(request.getDescription());
-        item.setPrice(request.getPrice());
-        return toResponse(menuItemRepository.save(item));
+        // 旧 MenuItem 模块写接口暂时默认拒绝（403）。
+        // 原因：无归属校验，任意登录用户可修改任意菜单项；
+        // 系统当前没有可信的餐厅所有权授权体系。
+        throw new ForbiddenException("Menu item update is temporarily disabled");
     }
 
     @Override
     public void delete(Long id) {
-        MenuItem item = findByIdOrThrow(id);
-        menuItemRepository.delete(item);
+        // 旧 MenuItem 模块写接口暂时默认拒绝（403）。
+        // 原因：无归属校验，任意登录用户可删除任意菜单项；
+        // 系统当前没有可信的餐厅所有权授权体系。
+        throw new ForbiddenException("Menu item deletion is temporarily disabled");
     }
 
     private MenuItem findByIdOrThrow(Long id) {

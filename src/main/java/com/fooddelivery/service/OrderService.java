@@ -4,6 +4,7 @@ import com.fooddelivery.dto.OrderItemResponse;
 import com.fooddelivery.dto.OrderRequest;
 import com.fooddelivery.dto.OrderResponse;
 import com.fooddelivery.entity.*;
+import com.fooddelivery.exception.ForbiddenException;
 import com.fooddelivery.exception.ResourceNotFoundException;
 import com.fooddelivery.repository.MenuItemRepository;
 import com.fooddelivery.repository.OrderRepository;
@@ -26,6 +27,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final RestaurantRepository restaurantRepository;
     private final MenuItemRepository menuItemRepository;
+    private final CurrentUserService currentUserService;
 
     public OrderResponse createOrder(String customerEmail, OrderRequest request) {
         User customer = userRepository.findByEmail(customerEmail)
@@ -64,8 +66,7 @@ public class OrderService {
     }
 
     public OrderResponse getById(Long id) {
-        Order order = findByIdOrThrow(id);
-        return toResponse(order);
+        return toResponse(requireOwnOrder(id));
     }
 
     public List<OrderResponse> getByCustomer(String customerEmail) {
@@ -78,14 +79,22 @@ public class OrderService {
     }
 
     public List<OrderResponse> getByRestaurant(Long restaurantId) {
-        return orderRepository.findByRestaurantId(restaurantId)
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        // 保留餐厅是否存在的处理：不存在返回 404，不泄露信息。
+        restaurantRepository.findById(restaurantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Restaurant not found with id: " + restaurantId));
+
+        // 该接口暂时对所有用户默认拒绝（403）。
+        // 原因：原实现依赖 Restaurant.ownerId 判断权限，但 ownerId 是旧模型遗留的占位字段（非外键），
+        // 且客户端可通过 PUT /api/restaurants/{id} 任意篡改（RestaurantServiceImpl.update 直接
+        // setOwnerId(request.getOwnerId())），因此不能作为可信授权依据；系统当前也没有可信的餐厅
+        // 所有权授权体系或可靠的餐厅 owner 管理员规则（User.Role.RESTAURANT_OWNER 未被任何授权逻辑消费）。
+        // 未来恢复访问需先建立可信的餐厅所有权授权体系（如 ownerId 改为对 User 的真实外键、由认证上下文
+        // 写入且禁止客户端篡改，并配套餐厅 owner 角色授权规则）。
+        throw new ForbiddenException("Restaurant order listing is temporarily disabled");
     }
 
     public OrderResponse updateStatus(Long id, Order.OrderStatus status) {
-        Order order = findByIdOrThrow(id);
+        Order order = requireOwnOrder(id);
         order.setStatus(status);
         return toResponse(orderRepository.save(order));
     }
@@ -93,6 +102,15 @@ public class OrderService {
     private Order findByIdOrThrow(Long id) {
         return orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + id));
+    }
+
+    private Order requireOwnOrder(Long id) {
+        Order order = findByIdOrThrow(id);
+        Long currentUserId = currentUserService.getCurrentUserId();
+        if (!order.getCustomer().getId().equals(currentUserId)) {
+            throw new ForbiddenException("You are not authorized to access this order");
+        }
+        return order;
     }
 
     private OrderResponse toResponse(Order order) {

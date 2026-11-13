@@ -4,6 +4,7 @@ import com.fooddelivery.dto.AuthResponse;
 import com.fooddelivery.dto.LoginRequest;
 import com.fooddelivery.dto.RegisterRequest;
 import com.fooddelivery.entity.User;
+import com.fooddelivery.exception.ConflictException;
 import com.fooddelivery.repository.UserRepository;
 import com.fooddelivery.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -23,14 +24,14 @@ public class AuthService {
 
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already registered: " + request.getEmail());
+            throw new ConflictException("Email already registered: " + request.getEmail());
         }
 
         User user = User.builder()
                 .name(request.getName())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role(request.getRole())
+                .role(User.Role.CUSTOMER)
                 .active(true)
                 .build();
 

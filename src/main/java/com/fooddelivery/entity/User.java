@@ -15,20 +15,21 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 254)
     private String email;
 
-    @Column(nullable = false)
+    @Column(name = "password_hash", nullable = false, length = 255)
     private String password;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private String name;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "`role`", nullable = false, length = 32)
     private Role role;
 
     @Builder.Default
+    @Column(nullable = false)
     private boolean active = true;
 
     public enum Role {

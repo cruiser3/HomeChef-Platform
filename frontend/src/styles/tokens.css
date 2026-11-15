@@ -1,0 +1,25 @@
+:root {
+  color-scheme: light;
+  font-family: "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  color: #33413a;
+  background: #faf6ef;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --bg: #faf6ef;
+  --card: #fff;
+  --primary: #6b9e7c;
+  --primary-dark: #558767;
+  --text: #33413a;
+  --text-secondary: #718078;
+  --text-muted: #93a19a;
+  --accent: #e8b04b;
+  --danger: #d05a4e;
+  --border: rgba(51, 65, 58, 0.09);
+  --surface-soft: #f1f6f0;
+  --radius: 14px;
+  --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.04);
+  --content-width: 1120px;
+}

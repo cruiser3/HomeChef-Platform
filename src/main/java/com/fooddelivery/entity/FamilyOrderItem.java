@@ -6,9 +6,13 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
-@Table(name = "family_order_items")
+@Table(name = "family_order_items",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_family_order_items_family_order_id",
+                columnNames = {"family_id", "order_id", "id"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -24,7 +28,10 @@ public class FamilyOrderItem {
     @JsonBackReference
     private FamilyOrder order;
 
-    @Column(name = "dish_id")
+    @Column(name = "family_id", nullable = false)
+    private Long familyId;
+
+    @Column(name = "dish_id", nullable = false)
     private Long dishId;
 
     @Column(name = "dish_name_snapshot", nullable = false, length = 100)
@@ -58,7 +65,11 @@ public class FamilyOrderItem {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneOffset.UTC);
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     public enum CookStatus {
         PENDING, COOKING, READY, SERVED, BLOCKED;

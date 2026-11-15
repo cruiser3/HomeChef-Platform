@@ -73,10 +73,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/api/auth/**").permitAll()
-                        .requestMatchers("/h2-console/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .headers(headers -> headers.frameOptions(frame -> frame.disable())) // needed for H2 console
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(restAuthenticationEntryPoint))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

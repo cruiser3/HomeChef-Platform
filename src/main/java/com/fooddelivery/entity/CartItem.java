@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "cart_items",
@@ -34,9 +35,13 @@ public class CartItem {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneOffset.UTC);
 
     @Column(name = "updated_at", nullable = false)
     @Builder.Default
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    private LocalDateTime updatedAt = LocalDateTime.now(ZoneOffset.UTC);
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 }

@@ -53,7 +53,8 @@ public class FamilyServiceImpl implements FamilyService {
     @Override
     @Transactional(readOnly = true)
     public List<FamilyResponse> listMyFamilies() {
-        List<FamilyMember> memberships = familyMemberRepository.findByUserId(currentUserService.getCurrentUserId());
+        List<FamilyMember> memberships = familyMemberRepository
+                .findByUserIdAndLeftAtIsNull(currentUserService.getCurrentUserId());
         if (memberships.isEmpty()) {
             return List.of();
         }
@@ -61,8 +62,7 @@ public class FamilyServiceImpl implements FamilyService {
         List<Long> familyIds = memberships.stream().map(FamilyMember::getFamilyId).toList();
         Map<Long, Family> families = familyRepository.findAllById(familyIds).stream()
                 .collect(Collectors.toMap(Family::getId, family -> family));
-        Map<Long, Long> memberCounts = familyMemberRepository.findAll().stream()
-                .filter(member -> familyIds.contains(member.getFamilyId()))
+        Map<Long, Long> memberCounts = familyMemberRepository.findByFamilyIdInAndLeftAtIsNull(familyIds).stream()
                 .collect(Collectors.groupingBy(FamilyMember::getFamilyId, Collectors.counting()));
 
         return memberships.stream()
@@ -78,11 +78,11 @@ public class FamilyServiceImpl implements FamilyService {
     @Transactional(readOnly = true)
     public FamilyResponse getMyFamily(Long familyId) {
         FamilyMember membership = familyMemberRepository
-                .findByFamilyIdAndUserId(familyId, currentUserService.getCurrentUserId())
+                .findByFamilyIdAndUserIdAndLeftAtIsNull(familyId, currentUserService.getCurrentUserId())
                 .orElseThrow(() -> new ForbiddenException("You are not a member of this family"));
         Family family = familyRepository.findById(familyId)
                 .orElseThrow(() -> new ForbiddenException("You are not a member of this family"));
-        int memberCount = familyMemberRepository.findByFamilyId(familyId).size();
+        int memberCount = familyMemberRepository.findByFamilyIdAndLeftAtIsNull(familyId).size();
         return toResponse(family, membership.getRole(), memberCount);
     }
 
@@ -94,7 +94,7 @@ public class FamilyServiceImpl implements FamilyService {
     }
 
     private List<FamilyMemberResponse> buildMemberList(Long familyId) {
-        List<FamilyMember> members = familyMemberRepository.findByFamilyId(familyId);
+        List<FamilyMember> members = familyMemberRepository.findByFamilyIdAndLeftAtIsNull(familyId);
         Map<Long, String> memberNames = userRepository.findAllById(
                 members.stream().map(FamilyMember::getUserId).toList()).stream()
                 .collect(Collectors.toMap(User::getId, User::getName));

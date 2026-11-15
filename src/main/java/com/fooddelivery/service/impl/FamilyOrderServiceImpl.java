@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +98,10 @@ public class FamilyOrderServiceImpl implements FamilyOrderService {
                 .remark(request == null ? null : request.getRemark())
                 .build();
 
-        orderItems.forEach(item -> item.setOrder(order));
+        orderItems.forEach(item -> {
+            item.setOrder(order);
+            item.setFamilyId(order.getFamilyId());
+        });
         order.getItems().addAll(orderItems);
 
         FamilyOrder saved = familyOrderRepository.save(order);
@@ -145,9 +149,9 @@ public class FamilyOrderServiceImpl implements FamilyOrderService {
         }
 
         order.setStatus(FamilyOrder.OrderStatus.CANCELLED);
-        order.setCancelledAt(LocalDateTime.now());
+        order.setCancelledAt(LocalDateTime.now(ZoneOffset.UTC));
         order.setCancelledBy(userId);
-        order.setUpdatedAt(LocalDateTime.now());
+        order.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
 
         return toResponse(familyOrderRepository.save(order));
     }
@@ -165,7 +169,7 @@ public class FamilyOrderServiceImpl implements FamilyOrderService {
         }
 
         order.setStatus(FamilyOrder.OrderStatus.PREPARING);
-        order.setUpdatedAt(LocalDateTime.now());
+        order.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         return toResponse(familyOrderRepository.save(order));
     }
 
@@ -179,8 +183,8 @@ public class FamilyOrderServiceImpl implements FamilyOrderService {
         }
 
         order.setMealServed(true);
-        order.setMealServedAt(LocalDateTime.now());
-        order.setUpdatedAt(LocalDateTime.now());
+        order.setMealServedAt(LocalDateTime.now(ZoneOffset.UTC));
+        order.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         return toResponse(familyOrderRepository.save(order));
     }
 
@@ -219,10 +223,10 @@ public class FamilyOrderServiceImpl implements FamilyOrderService {
         item.setCookStatus(target);
         item.setBlockedReason(target == FamilyOrderItem.CookStatus.BLOCKED ? request.getBlockedReason().trim() : null);
         item.setCookStatusUpdatedBy(userId);
-        item.setCookStatusUpdatedAt(LocalDateTime.now());
+        item.setCookStatusUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         familyOrderItemRepository.save(item);
 
-        order.setUpdatedAt(LocalDateTime.now());
+        order.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         familyOrderRepository.save(order);
 
         return toResponse(order);
@@ -235,7 +239,8 @@ public class FamilyOrderServiceImpl implements FamilyOrderService {
         if (request == null || request.getResponsibleUserId() == null) {
             throw new BadRequestException("Responsible user id is required");
         }
-        if (!familyMemberRepository.existsByFamilyIdAndUserId(familyId, request.getResponsibleUserId())) {
+        if (!familyMemberRepository.existsByFamilyIdAndUserIdAndLeftAtIsNull(
+                familyId, request.getResponsibleUserId())) {
             throw new ForbiddenException("Responsible user must be a member of this family");
         }
 

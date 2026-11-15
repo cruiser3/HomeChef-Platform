@@ -1,16 +1,34 @@
+# ===== Java / Maven =====
 target/
 *.class
+
+# ===== IDE =====
 .idea/
 *.iml
+.vscode/
+
+# ===== 操作系统 =====
+.DS_Store
+Thumbs.db
+
+# ===== 日志 =====
+logs/
+*.log
+
+# ===== 环境变量 / 本地敏感配置 =====
 .env
 application-local.properties
 
-# 本地数据 / IDE / AI 工具配置，不上传
+# ===== Node / 前端 =====
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# ===== 本地数据 / AI / IDE 工具配置，不上传 =====
 data/
 .codebuddy/
 .trae/
 AGENTS.md
 .github/modernize/
-docs/
-img.png
-src/test/
+.frontend/

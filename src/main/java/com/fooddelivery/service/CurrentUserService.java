@@ -6,6 +6,7 @@ import com.fooddelivery.exception.ForbiddenException;
 import com.fooddelivery.exception.ResourceNotFoundException;
 import com.fooddelivery.repository.FamilyMemberRepository;
 import com.fooddelivery.repository.UserRepository;
+import com.fooddelivery.util.EmailNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
@@ -25,7 +26,7 @@ public class CurrentUserService {
                 || authentication.getName() == null) {
             throw new AuthenticationCredentialsNotFoundException("Authentication required");
         }
-        String email = authentication.getName();
+        String email = EmailNormalizer.normalize(authentication.getName());
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("Authentication required"));
     }
@@ -35,7 +36,7 @@ public class CurrentUserService {
     }
 
     public FamilyMember requireMembership(Long familyId) {
-        return familyMemberRepository.findByFamilyIdAndUserId(familyId, getCurrentUserId())
+        return familyMemberRepository.findByFamilyIdAndUserIdAndLeftAtIsNull(familyId, getCurrentUserId())
                 .orElseThrow(() -> new ForbiddenException("You are not a member of this family"));
     }
 
@@ -47,7 +48,7 @@ public class CurrentUserService {
     }
 
     public FamilyMember requireExistingFamilyMembership(Long familyId) {
-        return familyMemberRepository.findByFamilyIdAndUserId(familyId, getCurrentUserId())
+        return familyMemberRepository.findByFamilyIdAndUserIdAndLeftAtIsNull(familyId, getCurrentUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("Family not found with id: " + familyId));
     }
 }

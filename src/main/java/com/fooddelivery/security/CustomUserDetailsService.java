@@ -2,6 +2,7 @@ package com.fooddelivery.security;
 
 import com.fooddelivery.entity.User;
 import com.fooddelivery.repository.UserRepository;
+import com.fooddelivery.util.EmailNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,8 +20,9 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+        String normalizedEmail = EmailNormalizer.normalize(email);
+        User user = userRepository.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + normalizedEmail));
 
         return org.springframework.security.core.userdetails.User.builder()
                 .username(user.getEmail())

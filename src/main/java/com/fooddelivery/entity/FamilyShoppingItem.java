@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "family_shopping_items")
@@ -41,5 +42,5 @@ public class FamilyShoppingItem {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneOffset.UTC);
 }

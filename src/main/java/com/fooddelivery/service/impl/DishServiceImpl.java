@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -132,7 +133,7 @@ public class DishServiceImpl implements DishService {
         dish.setCategoryId(request.getCategoryId());
         dish.setCookingMinutes(request.getCookingMinutes());
         dish.setPrice(request.getPrice());
-        dish.setUpdatedAt(LocalDateTime.now());
+        dish.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         Dish saved = dishRepository.save(dish);
 
         dishIngredientRepository.deleteByDishId(dishId);
@@ -152,7 +153,7 @@ public class DishServiceImpl implements DishService {
         requireModifyPermission(familyId, dish);
 
         dish.setAvailable(available);
-        dish.setUpdatedAt(LocalDateTime.now());
+        dish.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         Dish saved = dishRepository.save(dish);
 
         DishResponse response = buildResponse(saved, creatorNameOf(saved.getCreatedBy()));

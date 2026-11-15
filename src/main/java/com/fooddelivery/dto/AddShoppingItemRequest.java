@@ -1,6 +1,7 @@
 package com.fooddelivery.dto;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -17,6 +18,7 @@ public class AddShoppingItemRequest {
 
     @NotNull(message = "Amount is required")
     @DecimalMin(value = "0.01", message = "Amount must be greater than 0")
+    @Digits(integer = 8, fraction = 2, message = "Amount must have at most 8 integer digits and 2 decimals")
     private BigDecimal amount;
 
     @NotBlank(message = "Unit is required")

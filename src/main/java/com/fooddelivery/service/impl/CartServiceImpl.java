@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -65,7 +66,7 @@ public class CartServiceImpl implements CartService {
         int merged = item.getQuantity() + request.getQuantity();
         validateQuantity(merged);
         item.setQuantity(merged);
-        item.setUpdatedAt(LocalDateTime.now());
+        item.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         cartItemRepository.save(item);
 
         return buildCart(familyId, userId);
@@ -85,7 +86,7 @@ public class CartServiceImpl implements CartService {
         requireAvailableFamilyDish(familyId, item.getDishId());
 
         item.setQuantity(request.getQuantity());
-        item.setUpdatedAt(LocalDateTime.now());
+        item.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         cartItemRepository.save(item);
 
         return buildCart(familyId, userId);

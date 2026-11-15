@@ -5,9 +5,11 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
-@Table(name = "dishes")
+@Table(name = "dishes",
+        uniqueConstraints = @UniqueConstraint(name = "uk_dishes_family_id", columnNames = {"family_id", "id"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -48,9 +50,9 @@ public class Dish {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneOffset.UTC);
 
     @Column(name = "updated_at", nullable = false)
     @Builder.Default
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    private LocalDateTime updatedAt = LocalDateTime.now(ZoneOffset.UTC);
 }

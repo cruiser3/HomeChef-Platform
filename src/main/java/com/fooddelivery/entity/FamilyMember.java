@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "family_members",
@@ -25,12 +26,15 @@ public class FamilyMember {
     private Long userId;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(name = "`role`", nullable = false, length = 20)
     private FamilyRole role;
 
     @Column(name = "joined_at", nullable = false, updatable = false)
     @Builder.Default
-    private LocalDateTime joinedAt = LocalDateTime.now();
+    private LocalDateTime joinedAt = LocalDateTime.now(ZoneOffset.UTC);
+
+    @Column(name = "left_at")
+    private LocalDateTime leftAt;
 
     public enum FamilyRole {
         ADMIN, MEMBER

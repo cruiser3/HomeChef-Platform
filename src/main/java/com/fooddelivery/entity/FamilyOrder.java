@@ -5,11 +5,13 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "family_orders")
+@Table(name = "family_orders",
+        uniqueConstraints = @UniqueConstraint(name = "uk_family_orders_family_id", columnNames = {"family_id", "id"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -58,15 +60,19 @@ public class FamilyOrder {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneOffset.UTC);
 
     @Column(name = "updated_at", nullable = false)
     @Builder.Default
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    private LocalDateTime updatedAt = LocalDateTime.now(ZoneOffset.UTC);
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "order", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @Builder.Default
     private List<FamilyOrderItem> items = new ArrayList<>();
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     public enum OrderStatus {
         CREATED, PREPARING, COMPLETED, CANCELLED

@@ -5,7 +5,10 @@ import lombok.*;
 
 @Entity
 @Table(name = "dish_categories",
-        uniqueConstraints = @UniqueConstraint(name = "uk_dish_category_family_name", columnNames = {"family_id", "name"}))
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_dish_category_family_name", columnNames = {"family_id", "name"}),
+                @UniqueConstraint(name = "uk_dish_categories_family_id", columnNames = {"family_id", "id"})
+        })
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

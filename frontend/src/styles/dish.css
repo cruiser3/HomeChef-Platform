@@ -1,0 +1,854 @@
+.dish-page {
+  display: grid;
+  gap: 20px;
+}
+
+.dish-hero {
+  display: grid;
+  gap: 12px;
+}
+
+.dish-hero-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dish-hero-row h1 {
+  margin: 0;
+  font-size: clamp(26px, 5vw, 34px);
+  letter-spacing: 0.02em;
+}
+
+.dish-add-btn {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--primary-dark);
+  color: #fff;
+  font-size: 22px;
+}
+
+.dish-add-btn:hover {
+  background: var(--primary);
+}
+
+.dish-hero .van-search {
+  padding: 0;
+  background: transparent;
+}
+
+.dish-categories {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.dish-categories::-webkit-scrollbar {
+  display: none;
+}
+
+.dish-category-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dish-category-chip.is-active {
+  border-color: var(--primary-dark);
+  background: var(--primary-dark);
+  color: #fff;
+}
+
+.dish-category-add {
+  color: var(--primary-dark);
+  border-style: dashed;
+}
+
+.dish-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.dish-error {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.dish-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 16px;
+}
+
+.dish-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow-soft);
+  transition: transform 150ms ease;
+}
+
+.dish-card:hover {
+  transform: translateY(-2px);
+}
+
+.dish-card-media {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--surface-soft);
+}
+
+.dish-card-media .van-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dish-card-fallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  padding: 10px;
+  place-items: center;
+  text-align: center;
+  color: var(--primary-dark);
+  font-family: 'STKaiti', 'KaiTi', 'STSong', 'Songti SC', serif;
+  font-size: clamp(20px, 3.6vw, 30px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.35;
+  background: linear-gradient(135deg, #eef4ef 0%, #dfe9e2 100%);
+  text-shadow: 0 2px 8px rgba(51, 65, 58, 0.14);
+}
+
+.dish-card-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(51, 65, 58, 0.82);
+  color: #fff;
+  font-size: 11px;
+}
+
+.dish-card.is-unavailable .dish-card-media {
+  opacity: 0.6;
+}
+
+.dish-card-body {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px 14px;
+}
+
+.dish-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.dish-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.dish-card-rating {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.dish-card-price {
+  margin: 0;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.dish-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  padding: 0;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.dish-detail {
+  display: grid;
+  gap: 20px;
+}
+
+.dish-detail-media {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.dish-detail-media .van-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dish-detail-head h1 {
+  margin: 0 0 8px;
+  font-size: clamp(24px, 4vw, 32px);
+}
+
+.dish-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.dish-detail-price {
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.dish-detail-desc {
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.dish-detail-creator {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.dish-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.dish-detail-actions .van-button {
+  flex: 1 1 160px;
+}
+
+.dish-detail-section h2 {
+  margin: 0 0 12px;
+  font-size: 17px;
+}
+
+.dish-ingredient-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dish-ingredient-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.dish-ingredient-amount {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.dish-step-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dish-step-list li {
+  display: flex;
+  gap: 12px;
+}
+
+.dish-step-no {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-soft);
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dish-step-content p {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.dish-step-image {
+  margin-top: 10px;
+  overflow: hidden;
+  max-width: 320px;
+  border-radius: 12px;
+}
+
+.dish-edit {
+  display: grid;
+  gap: 20px;
+}
+
+.dish-edit-head h1 {
+  margin: 8px 0 0;
+  font-size: clamp(24px, 4vw, 30px);
+}
+
+.dish-edit-form {
+  display: grid;
+  gap: 18px;
+}
+
+.dish-edit-form > .van-cell {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.dish-edit-sub {
+  display: grid;
+  gap: 12px;
+}
+
+.dish-edit-sub-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dish-edit-sub-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.dish-edit-sub-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.step-paste-textarea {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.step-paste-preview {
+  margin-top: 14px;
+}
+
+.step-paste-count {
+  margin: 0 0 8px;
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.step-paste-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0 0 0 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.step-paste-list li {
+  white-space: pre-wrap;
+}
+
+.dish-ingredient-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.dish-step-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.dish-step-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dish-ingredient-row .van-cell,
+.dish-step-row .van-cell {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.dish-step-index {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  margin-top: 8px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-soft);
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dish-row-remove {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.dish-row-remove:hover {
+  background: #fbf0ee;
+  color: var(--danger);
+}
+
+.dish-edit-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.dish-image-field {
+  display: grid;
+  gap: 8px;
+}
+
+.dish-image-field .van-field {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.dish-image-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dish-image-preview {
+  width: 72px;
+  height: 72px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.dish-edit-actions {
+  margin-top: 6px;
+}
+
+.dish-edit-actions .van-button {
+  height: 48px;
+  border-radius: 13px;
+  font-weight: 600;
+}
+
+.dish-category-sheet {
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+}
+
+.dish-category-sheet h2 {
+  margin: 0 0 16px;
+  font-size: 18px;
+}
+
+.dish-category-sheet .family-list {
+  margin-bottom: 16px;
+  overflow: hidden;
+  border-radius: var(--radius);
+}
+
+.dish-category-sheet .van-cell {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.dish-category-submit {
+  margin-top: 16px;
+}
+
+.dish-category-create {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dish-category-manage-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dish-category-manage-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.dish-category-manage-item .van-field {
+  flex: 1;
+  padding: 0;
+}
+
+.dish-category-manage-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.dish-category-manage-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.unit-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.unit-chip {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.unit-chip:active {
+  background: var(--surface-soft);
+}
+
+.dish-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dish-card-creator {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.dish-view-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+
+.dish-view-switch button {
+  min-height: 32px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.dish-view-switch button.is-active {
+  background: var(--card);
+  color: var(--primary-dark);
+  font-weight: 600;
+  box-shadow: var(--shadow-soft);
+}
+
+.member-group {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.member-group h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+}
+
+.member-group h2 span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.member-dish-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.member-dish-item {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+@media (max-width: 767px) {
+  .dish-ingredient-row {
+    grid-template-columns: 1fr 1fr auto;
+  }
+
+  .dish-ingredient-row > .van-cell:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .unit-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 380px) {
+  .unit-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ===== 菜品评论 ===== */
+.dish-review-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.dish-review-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.dish-review-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dish-review-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.review-entry {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.review-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-avatar {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--surface-soft);
+  color: var(--primary-dark);
+  font-size: 16px;
+}
+
+.review-avatar.is-anonymous {
+  color: var(--text-muted);
+}
+
+.review-entry-user {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.review-entry-content {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.review-entry-image {
+  max-width: 220px;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.review-entry-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.review-link-btn {
+  border: none;
+  padding: 0;
+  background: none;
+  color: var(--primary-dark);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.review-link-btn.is-danger {
+  color: var(--danger);
+}
+
+.review-add-btn {
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  padding: 5px 14px;
+  background: transparent;
+  color: var(--primary-dark);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.review-sheet {
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+}
+
+.review-sheet h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.review-sheet-dish {
+  margin: 0 0 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.review-rate-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.review-rate-label {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.review-sheet .van-cell {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.review-image-field {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.review-image-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+}
+
+.review-anonymous-cell {
+  margin-top: 12px;
+}
+
+.review-submit {
+  margin-top: 16px;
+}

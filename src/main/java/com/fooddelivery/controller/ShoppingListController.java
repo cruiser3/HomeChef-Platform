@@ -2,6 +2,8 @@ package com.fooddelivery.controller;
 
 import com.fooddelivery.dto.AddShoppingItemRequest;
 import com.fooddelivery.dto.ShoppingItemResponse;
+import com.fooddelivery.dto.UpdatePurchasedRequest;
+import com.fooddelivery.dto.UpdateShoppingItemRequest;
 import com.fooddelivery.exception.BadRequestException;
 import com.fooddelivery.service.ShoppingListService;
 import jakarta.validation.Valid;
@@ -31,6 +33,32 @@ public class ShoppingListController {
             @Valid @RequestBody AddShoppingItemRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(shoppingListService.addItem(requireFamilyId(familyId), request));
+    }
+
+    @PutMapping("/items/{itemId}")
+    public ResponseEntity<ShoppingItemResponse> updateItem(
+            @RequestHeader(name = "X-Family-Id", required = false) Long familyId,
+            @PathVariable Long itemId,
+            @Valid @RequestBody UpdateShoppingItemRequest request) {
+        return ResponseEntity.ok(
+                shoppingListService.updateItem(requireFamilyId(familyId), itemId, request));
+    }
+
+    @PatchMapping("/items/{itemId}/purchased")
+    public ResponseEntity<ShoppingItemResponse> markPurchased(
+            @RequestHeader(name = "X-Family-Id", required = false) Long familyId,
+            @PathVariable Long itemId,
+            @Valid @RequestBody UpdatePurchasedRequest request) {
+        return ResponseEntity.ok(
+                shoppingListService.markPurchased(requireFamilyId(familyId), itemId, request));
+    }
+
+    @DeleteMapping("/items/{itemId}")
+    public ResponseEntity<Void> deleteItem(
+            @RequestHeader(name = "X-Family-Id", required = false) Long familyId,
+            @PathVariable Long itemId) {
+        shoppingListService.deleteItem(requireFamilyId(familyId), itemId);
+        return ResponseEntity.noContent().build();
     }
 
     private Long requireFamilyId(Long familyId) {

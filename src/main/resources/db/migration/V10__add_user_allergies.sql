@@ -1,0 +1,2 @@
+ALTER TABLE users
+    ADD COLUMN allergies VARCHAR(200) NULL;

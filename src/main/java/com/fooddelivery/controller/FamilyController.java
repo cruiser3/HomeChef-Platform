@@ -3,6 +3,9 @@ package com.fooddelivery.controller;
 import com.fooddelivery.dto.CreateFamilyRequest;
 import com.fooddelivery.dto.FamilyMemberResponse;
 import com.fooddelivery.dto.FamilyResponse;
+import com.fooddelivery.dto.InviteCodeResponse;
+import com.fooddelivery.dto.JoinFamilyRequest;
+import com.fooddelivery.dto.UpdateMemberRoleRequest;
 import com.fooddelivery.exception.BadRequestException;
 import com.fooddelivery.service.FamilyService;
 import jakarta.validation.Valid;
@@ -47,5 +50,36 @@ public class FamilyController {
             throw new BadRequestException("X-Family-Id header is required");
         }
         return ResponseEntity.ok(familyService.listMembers(familyId));
+    }
+
+    @GetMapping("/{familyId}/invite-code")
+    public ResponseEntity<InviteCodeResponse> getInviteCode(@PathVariable Long familyId) {
+        return ResponseEntity.ok(familyService.getInviteCode(familyId));
+    }
+
+    @PostMapping("/{familyId}/invite-code/reset")
+    public ResponseEntity<InviteCodeResponse> resetInviteCode(@PathVariable Long familyId) {
+        return ResponseEntity.ok(familyService.resetInviteCode(familyId));
+    }
+
+    @PostMapping("/join")
+    public ResponseEntity<FamilyResponse> joinFamily(@Valid @RequestBody JoinFamilyRequest request) {
+        return ResponseEntity.ok(familyService.joinFamily(request));
+    }
+
+    @DeleteMapping("/{familyId}/members/{userId}")
+    public ResponseEntity<Void> removeMember(
+            @PathVariable Long familyId,
+            @PathVariable Long userId) {
+        familyService.removeMember(familyId, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{familyId}/members/{userId}/role")
+    public ResponseEntity<FamilyMemberResponse> updateMemberRole(
+            @PathVariable Long familyId,
+            @PathVariable Long userId,
+            @Valid @RequestBody UpdateMemberRoleRequest request) {
+        return ResponseEntity.ok(familyService.updateMemberRole(familyId, userId, request));
     }
 }

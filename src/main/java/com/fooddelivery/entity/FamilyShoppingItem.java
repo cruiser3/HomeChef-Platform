@@ -40,6 +40,13 @@ public class FamilyShoppingItem {
     @Column(name = "added_by", nullable = false)
     private Long addedBy;
 
+    @Column(name = "purchased", nullable = false)
+    @Builder.Default
+    private boolean purchased = false;
+
+    @Column(name = "purchased_at")
+    private LocalDateTime purchasedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now(ZoneOffset.UTC);

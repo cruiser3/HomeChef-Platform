@@ -7,16 +7,21 @@ import com.fooddelivery.dto.DishResponse;
 import com.fooddelivery.entity.Dish;
 import com.fooddelivery.entity.DishCategory;
 import com.fooddelivery.entity.DishIngredient;
+import com.fooddelivery.entity.DishReview;
 import com.fooddelivery.entity.DishStep;
 import com.fooddelivery.entity.FamilyMember;
 import com.fooddelivery.entity.User;
 import com.fooddelivery.exception.BadRequestException;
+import com.fooddelivery.exception.ConflictException;
 import com.fooddelivery.exception.ForbiddenException;
 import com.fooddelivery.exception.ResourceNotFoundException;
+import com.fooddelivery.repository.CartItemRepository;
 import com.fooddelivery.repository.DishCategoryRepository;
 import com.fooddelivery.repository.DishIngredientRepository;
 import com.fooddelivery.repository.DishRepository;
+import com.fooddelivery.repository.DishReviewRepository;
 import com.fooddelivery.repository.DishStepRepository;
+import com.fooddelivery.repository.FamilyOrderItemRepository;
 import com.fooddelivery.repository.UserRepository;
 import com.fooddelivery.service.CurrentUserService;
 import com.fooddelivery.service.DishService;
@@ -28,6 +33,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -41,7 +47,10 @@ public class DishServiceImpl implements DishService {
     private final DishIngredientRepository dishIngredientRepository;
     private final DishStepRepository dishStepRepository;
     private final DishCategoryRepository dishCategoryRepository;
+    private final FamilyOrderItemRepository familyOrderItemRepository;
+    private final CartItemRepository cartItemRepository;
     private final UserRepository userRepository;
+    private final DishReviewRepository dishReviewRepository;
     private final CurrentUserService currentUserService;
 
     @Override
@@ -101,8 +110,13 @@ public class DishServiceImpl implements DishService {
         Map<Long, String> categoryNames = categoryNamesOf(familyId);
         Map<Long, String> creatorNames = creatorNamesOf(dishes);
 
+        Map<Long, double[]> ratingStats = ratingStatsOf(familyId, dishes);
         return dishes.stream()
-                .map(dish -> toSummaryResponse(dish, categoryNames, creatorNames))
+                .map(dish -> {
+                    DishResponse response = toSummaryResponse(dish, categoryNames, creatorNames);
+                    applyRating(response, ratingStats.get(dish.getId()));
+                    return response;
+                })
                 .toList();
     }
 
@@ -114,6 +128,7 @@ public class DishServiceImpl implements DishService {
 
         DishResponse response = buildResponse(dish, creatorNameOf(dish.getCreatedBy()));
         response.setCategoryName(categoryNameOf(familyId, dish.getCategoryId()));
+        applyRating(response, ratingStatsOf(familyId, List.of(dish)).get(dish.getId()));
         return response;
     }
 
@@ -138,6 +153,10 @@ public class DishServiceImpl implements DishService {
 
         dishIngredientRepository.deleteByDishId(dishId);
         dishStepRepository.deleteByDishId(dishId);
+        // 派生删除的 DELETE 会延迟到 flush 才执行，而 save() 为获取自增 ID 会立即 INSERT。
+        // 不先 flush 删除，新记录会撞上 (dish_id, sort_no)/(dish_id, step_no) 唯一约束（Duplicate entry）。
+        dishIngredientRepository.flush();
+        dishStepRepository.flush();
         saveIngredients(dishId, request.getIngredients());
         saveSteps(dishId, steps);
 
@@ -159,6 +178,24 @@ public class DishServiceImpl implements DishService {
         DishResponse response = buildResponse(saved, creatorNameOf(saved.getCreatedBy()));
         response.setCategoryName(categoryNameOf(familyId, saved.getCategoryId()));
         return response;
+    }
+
+    @Override
+    public void delete(Long familyId, Long dishId) {
+        currentUserService.requireMembership(familyId);
+        Dish dish = findDishInFamily(familyId, dishId);
+        requireModifyPermission(familyId, dish);
+
+        if (familyOrderItemRepository.existsByDishId(dishId)) {
+            throw new ConflictException(
+                    "Dish has been referenced by historical orders and cannot be deleted; "
+                            + "use availability to take it off the menu instead");
+        }
+
+        dishIngredientRepository.deleteByDishId(dishId);
+        dishStepRepository.deleteByDishId(dishId);
+        cartItemRepository.deleteByDishId(dishId);
+        dishRepository.delete(dish);
     }
 
     @Override
@@ -194,6 +231,45 @@ public class DishServiceImpl implements DishService {
                 .name(saved.getName())
                 .sortNo(saved.getSortNo())
                 .build();
+    }
+
+    @Override
+    public DishCategoryResponse updateCategory(Long familyId, Long categoryId, DishCategoryRequest request) {
+        currentUserService.requireMembership(familyId);
+        DishCategory category = dishCategoryRepository.findByIdAndFamilyId(categoryId, familyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + categoryId));
+
+        String name = request.getName().trim();
+        if (!name.equals(category.getName())
+                && dishCategoryRepository.existsByFamilyIdAndName(familyId, name)) {
+            throw new BadRequestException("Category already exists in this family: " + name);
+        }
+
+        category.setName(name);
+        if (request.getSortNo() != null) {
+            category.setSortNo(request.getSortNo());
+        }
+        DishCategory saved = dishCategoryRepository.save(category);
+        return DishCategoryResponse.builder()
+                .id(saved.getId())
+                .familyId(saved.getFamilyId())
+                .name(saved.getName())
+                .sortNo(saved.getSortNo())
+                .build();
+    }
+
+    @Override
+    public void deleteCategory(Long familyId, Long categoryId) {
+        currentUserService.requireMembership(familyId);
+        DishCategory category = dishCategoryRepository.findByIdAndFamilyId(categoryId, familyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + categoryId));
+
+        // 先把该分类下菜品置为「未分类」（category_id 外键为 ON DELETE RESTRICT，必须先清空再删分类）
+        List<Dish> dishes = dishRepository.findByFamilyIdAndCategoryIdOrderByCreatedAtDesc(familyId, categoryId);
+        dishes.forEach(dish -> dish.setCategoryId(null));
+        dishRepository.flush();
+
+        dishCategoryRepository.delete(category);
     }
 
     private void validateDishRequest(DishRequest request) {
@@ -374,6 +450,35 @@ public class DishServiceImpl implements DishService {
 
     private String creatorNameOf(Long creatorId) {
         return userRepository.findById(creatorId).map(User::getName).orElse(null);
+    }
+
+    private Map<Long, double[]> ratingStatsOf(Long familyId, List<Dish> dishes) {
+        List<Long> dishIds = dishes.stream().map(Dish::getId).toList();
+        if (dishIds.isEmpty()) {
+            return Map.of();
+        }
+        List<DishReview> reviews = dishReviewRepository
+                .findByFamilyIdAndDishIdInAndParentIdIsNull(familyId, dishIds);
+        Map<Long, double[]> stats = new HashMap<>();
+        for (DishReview review : reviews) {
+            if (review.getRating() == null) {
+                continue;
+            }
+            double[] stat = stats.computeIfAbsent(review.getDishId(), k -> new double[2]);
+            stat[0] += review.getRating();
+            stat[1] += 1;
+        }
+        return stats;
+    }
+
+    private void applyRating(DishResponse response, double[] stat) {
+        if (stat == null || stat[1] == 0) {
+            response.setAverageRating(null);
+            response.setReviewCount(0);
+            return;
+        }
+        response.setAverageRating(stat[0] / stat[1]);
+        response.setReviewCount((int) stat[1]);
     }
 
     private String currentUserName() {

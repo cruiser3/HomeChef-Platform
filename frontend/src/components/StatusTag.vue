@@ -7,7 +7,7 @@ defineProps({
   tone: {
     type: String,
     default: 'neutral',
-    validator: (value) => ['neutral', 'primary', 'warm'].includes(value),
+    validator: (value) => ['neutral', 'primary', 'warm', 'success', 'danger'].includes(value),
   },
 })
 </script>

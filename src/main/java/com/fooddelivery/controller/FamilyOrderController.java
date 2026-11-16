@@ -79,6 +79,14 @@ public class FamilyOrderController {
         return ResponseEntity.ok(familyOrderService.assignResponsible(requireFamilyId(familyId), orderItemId, request));
     }
 
+    @DeleteMapping("/{orderId}")
+    public ResponseEntity<Void> deleteOrder(
+            @RequestHeader(name = "X-Family-Id", required = false) Long familyId,
+            @PathVariable Long orderId) {
+        familyOrderService.deleteOrder(requireFamilyId(familyId), orderId);
+        return ResponseEntity.noContent().build();
+    }
+
     private Long requireFamilyId(Long familyId) {
         if (familyId == null) {
             throw new BadRequestException("X-Family-Id header is required");

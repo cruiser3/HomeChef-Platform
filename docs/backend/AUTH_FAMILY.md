@@ -22,6 +22,9 @@
 | `src/main/java/com/fooddelivery/dto/CreateFamilyRequest.java` | 创建家庭请求 |
 | `src/main/java/com/fooddelivery/dto/FamilyResponse.java` | 家庭响应 |
 | `src/main/java/com/fooddelivery/dto/FamilyMemberResponse.java` | 成员响应 |
+| `src/main/java/com/fooddelivery/dto/InviteCodeResponse.java` | 邀请码响应 |
+| `src/main/java/com/fooddelivery/dto/JoinFamilyRequest.java` | 凭邀请码加入请求 |
+| `src/main/java/com/fooddelivery/dto/UpdateMemberRoleRequest.java` | 修改成员角色请求 |
 | `src/main/java/com/fooddelivery/exception/ForbiddenException.java` | 403 业务异常 |
 | `src/main/java/com/fooddelivery/exception/BadRequestException.java` | 400 业务异常 |
 | `src/test/java/com/fooddelivery/service/FamilyServiceImplTest.java` | 家庭服务测试（5 个用例） |
@@ -88,7 +91,7 @@
 要点：
 
 - 注册流程只会产生 `User.Role.CUSTOMER`，普通注册无法获得系统级管理员权限。
-- 家庭管理员身份只由"创建家庭"这一服务端流程写入，不接受前端指定。
+- 家庭管理员身份由"创建家庭"或"管理员修改角色"这两个服务端流程写入，不接受前端自行指定；修改角色、移除成员均需 `ADMIN` 权限且受"最后一个管理员保护"约束。
 - 家庭角色不写入 JWT。每次请求都要按 `familyId + 当前用户` 实时查询 `family_members`，因此成员关系变化会立即生效。
 
 ---
@@ -113,12 +116,21 @@
 | GET | `/api/families/{familyId}` | 查看指定家庭详情 | 必须是该家庭成员 | 200 |
 | GET | `/api/families/{familyId}/members` | 查看该家庭成员列表 | 必须是该家庭成员 | 200 |
 | GET | `/api/families/current/members` | 按请求头 `X-Family-Id` 查看"当前家庭"成员 | 必须携带该请求头；必须是该家庭成员 | 200 |
+| GET | `/api/families/{familyId}/invite-code` | 查看家庭邀请码 | 必须是该家庭成员 | 200 |
+| POST | `/api/families/{familyId}/invite-code/reset` | 重置家庭邀请码 | 必须是该家庭 `ADMIN` | 200 |
+| POST | `/api/families/join` | 凭邀请码加入家庭 | 需登录 | 200 |
+| DELETE | `/api/families/{familyId}/members/{userId}` | 移除成员 | 必须是该家庭 `ADMIN` | 204 |
+| PUT | `/api/families/{familyId}/members/{userId}/role` | 修改成员角色 | 必须是该家庭 `ADMIN` | 200 |
 
 ### 4.3 响应结构
 
 `FamilyResponse`：`id`、`name`、`createdBy`、`createdAt`、`currentUserRole`、`memberCount`。
 
 `FamilyMemberResponse`：`userId`、`name`、`role`。**不返回**邮箱、密码哈希、token 等敏感字段。
+
+`InviteCodeResponse`：`inviteCode`（8 位固定邀请码）。邀请码为家庭唯一、可由管理员重置的准入凭证；查看限成员，重置限管理员，凭码加入时后端不信任前端传入的 `familyId`，只凭邀请码反查家庭。
+
+`UpdateMemberRoleRequest`：`role`（仅 `ADMIN`/`MEMBER`，非法 400）。移除成员与修改角色均仅 `ADMIN` 可操作；不能移除自己；家庭最后一个管理员不能被移除或降级（400）；移除采用软移除（记录 `leftAt`）并清空该成员在当前家庭的购物车。
 
 错误响应沿用项目原有 `ErrorResponse`：`timestamp`、`status`、`message`、`path`，校验失败时额外有 `fieldErrors`。
 
@@ -221,10 +233,13 @@ Surefire 报告实际内容：
 | B-01 | 未认证请求返回 403 而非 401 | 无 token 调用 `/api/families` 实测 403；原项目 `/api/restaurants` 同样 403；`SecurityConfig` 未配置 `authenticationEntryPoint` | 需人工批准后修改安全配置，补 401 入口点与 403 处理 |
 | B-02 | "当前家庭"未持久化 | 只通过请求头 `X-Family-Id` 表达，客户端无法跨请求记住选择 | 需确认是否增加 `current_family` 持久化字段或独立表 |
 | B-03 | 注册重复邮箱抛 `RuntimeException` | `AuthService.register` 中抛通用异常，会被兜底处理器转成 500，而非 409/400 | 后续改为明确的业务异常 |
-| B-04 | `requireAdmin` 尚无业务调用方 | 已实现家庭管理员校验能力，但当前没有管理员专属接口使用它 | 待邀请码模块（M-03）实现时接入 |
-| B-05 | 家庭成员加入方式尚未实现 | 目前只能通过"创建家庭"成为成员，邀请码加入（M-03）未开发 | 待阶段 2 |
+| B-04 | `requireAdmin` 已接入邀请码重置 | 邀请码重置接口 `POST /api/families/{familyId}/invite-code/reset` 使用 `requireAdmin` 校验管理员 | 已解决（M-03） |
+| B-05 | 家庭成员加入方式已实现 | 通过固定邀请码加入（M-03）；查看限成员、重置限管理员、凭码加入，重复加入 409、曾退出者复用原记录 | 已解决（M-03） |
 | B-06 | 测试依赖环境变量 | 缺少 `JWT_SECRET` 或 `GEMINI_API_KEY` 时 Spring 上下文无法加载，测试全部报错 | 本地与 CI 需注入变量（属既有问题） |
+| B-07 | 移除成员/修改角色已实现 | 均为本次新增能力，`mvn compile` 通过，Flyway 无涉及本模块新迁移（复用既有 `family_members.left_at`），HTTP 实测待执行 | 待执行 HTTP 实测后关闭 |
 
 ---
 
 > 维护记录：本文档只覆盖已完成的认证与家庭模块；M-03 及之后的模块完成后再单独建文档，不在此文件继续堆叠。
+> 维护记录：2026-11-15 补充 M-03 邀请码加入——固定 8 位邀请码、`GET /api/families/{familyId}/invite-code`（成员）、`POST /api/families/{familyId}/invite-code/reset`（管理员）、`POST /api/families/join`（凭码加入）；`families` 新增 `invite_code`（Flyway V4）。
+> 维护记录：2026-11-15 补充家庭成员移除与角色修改——`DELETE /api/families/{familyId}/members/{userId}`、`PUT /api/families/{familyId}/members/{userId}/role`，均限 `ADMIN`、含最后管理员保护；移除为软移除并清空购物车。

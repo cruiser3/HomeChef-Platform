@@ -19,7 +19,13 @@ public interface DishService {
 
     DishResponse changeAvailability(Long familyId, Long dishId, boolean available);
 
+    void delete(Long familyId, Long dishId);
+
     List<DishCategoryResponse> listCategories(Long familyId);
 
     DishCategoryResponse createCategory(Long familyId, DishCategoryRequest request);
+
+    DishCategoryResponse updateCategory(Long familyId, Long categoryId, DishCategoryRequest request);
+
+    void deleteCategory(Long familyId, Long categoryId);
 }

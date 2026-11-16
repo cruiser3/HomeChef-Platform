@@ -61,6 +61,14 @@ public class DishController {
         return ResponseEntity.ok(dishService.changeAvailability(requireFamilyId(familyId), dishId, available));
     }
 
+    @DeleteMapping("/{dishId}")
+    public ResponseEntity<Void> delete(
+            @RequestHeader(name = "X-Family-Id", required = false) Long familyId,
+            @PathVariable Long dishId) {
+        dishService.delete(requireFamilyId(familyId), dishId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/categories")
     public ResponseEntity<List<DishCategoryResponse>> listCategories(
             @RequestHeader(name = "X-Family-Id", required = false) Long familyId) {
@@ -73,6 +81,23 @@ public class DishController {
             @Valid @RequestBody DishCategoryRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(dishService.createCategory(requireFamilyId(familyId), request));
+    }
+
+    @PutMapping("/categories/{categoryId}")
+    public ResponseEntity<DishCategoryResponse> updateCategory(
+            @RequestHeader(name = "X-Family-Id", required = false) Long familyId,
+            @PathVariable Long categoryId,
+            @Valid @RequestBody DishCategoryRequest request) {
+        return ResponseEntity.ok(
+                dishService.updateCategory(requireFamilyId(familyId), categoryId, request));
+    }
+
+    @DeleteMapping("/categories/{categoryId}")
+    public ResponseEntity<Void> deleteCategory(
+            @RequestHeader(name = "X-Family-Id", required = false) Long familyId,
+            @PathVariable Long categoryId) {
+        dishService.deleteCategory(requireFamilyId(familyId), categoryId);
+        return ResponseEntity.noContent().build();
     }
 
     private Long requireFamilyId(Long familyId) {

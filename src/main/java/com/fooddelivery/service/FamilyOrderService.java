@@ -21,6 +21,8 @@ public interface FamilyOrderService {
 
     FamilyOrderResponse markMealServed(Long familyId, Long orderId);
 
+    void deleteOrder(Long familyId, Long orderId);
+
     FamilyOrderResponse updateCookStatus(Long familyId, Long orderItemId, UpdateCookStatusRequest request);
 
     FamilyOrderResponse assignResponsible(Long familyId, Long orderItemId, AssignResponsibleRequest request);

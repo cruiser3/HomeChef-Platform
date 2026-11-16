@@ -17,21 +17,21 @@
 | `project-analysis/PROJECT_ANALYSIS.md` | 原项目全面静态分析（架构、数据库、安全、代码质量、Java 学习地图） | 已完成（部分结论待验证；原 44 文件快照，遗留外卖模型已删除） | 项目级现状认知依据 |
 | `project-analysis/RUN_VERIFICATION.md` | 构建/启动运行验证记录（真实命令输出） | 已完成（H2 时代快照） | 阶段性验证记录 |
 | `testing/BASELINE_API_TEST_CASES.md` | 原项目基线接口测试用例（注册/登录/餐厅/菜品查询） | 已完成（用例为推导，待实测；覆盖的旧接口已删除） | 阶段性验证记录 |
-| `report/DECISION_LOG.md` | 关键技术决策记录（D-001 ~ D-024，含 MySQL 迁移、家庭订单、两套状态分离等） | 草稿/持续更新 | 项目级决策依据 + 历史记录 |
-| `report/COURSE_REPORT_WORKLOG.md` | 课程报告事实素材库（14 个章节） | 草稿/持续更新（已覆盖 MySQL 迁移与前端阶段 0/1） | 项目级事实依据 |
-| `report/AI_INTERACTION_LOG.md` | AI 辅助开发过程记录（统一模板） | 草稿/持续更新（已记录至任务 017 前后） | 历史记录 |
+| `report/DECISION_LOG.md` | 关键技术决策记录（D-001 ~ D-025，含 MySQL 迁移、家庭订单、两套状态分离、邀请码加入等） | 草稿/持续更新 | 项目级决策依据 + 历史记录 |
+| `report/COURSE_REPORT_WORKLOG.md` | 课程报告事实素材库（14 个章节） | 草稿/持续更新（已覆盖 MySQL 迁移、后端 M-01~M-09 与前端阶段 0~7 + 对齐入口） | 项目级事实依据 |
+| `report/AI_INTERACTION_LOG.md` | AI 辅助开发过程记录（统一模板） | 草稿/持续更新（已记录至任务 021） | 历史记录 |
 | `report/PROJECT_REPORT.md` | 课程设计最终报告的持续完善版 | 草稿/持续更新 | 最终交付产出 |
 | `database/MYSQL_DATABASE_DESIGN.md` | 当前 11 个实体的 MySQL 9.6.0 设计、ER 图、DDL、约束/索引、迁移执行、回滚和验收结果 | Flyway V1 已在 `homechef_platform` 成功迁移，11 张表/24 外键/10 唯一约束；Hibernate validate 通过；核心 API 冒烟通过；备份恢复与并发专项待完成 | 数据库设计与迁移记录 |
 | `database/MYSQL_MIGRATION_ISOLATED_TEST_REPORT.md` | 迁移前 MySQL 9.6、Connector/J、Flyway 的隔离兼容性测试及真实错误 | 历史报告；Flyway 13.12.2 不兼容已改用 BOM 管理的 10.10.0 规避并完成迁移 | 历史阶段测试报告 |
-| `backend/BACKEND_PROGRESS.md` | 后端进度总览：技术栈、模块状态、数据表、实测结果、遗留问题 | 已完成（2026-11-15 已同步 MySQL + 遗留代码删除 + 前端阶段 0/1） | 后端进度导航 |
+| `backend/BACKEND_PROGRESS.md` | 后端进度总览：技术栈、模块状态、数据表、实测结果、遗留问题 | 已完成（2026-11-15 已同步 MySQL + 遗留代码删除 + 前端阶段 0~7 + 对齐入口） | 后端进度导航 |
 | `backend/API_FRONTEND_CONTRACT.md` | 前后端交接文档（API 契约、认证、家庭隔离、错误处理规则） | 已完成（H2 时代编写，含旧外卖接口描述，字段以源码为准） | 前端对接依据 |
 | `backend/AUTH_FAMILY.md` | M-01/M-02 认证与家庭模块说明 | 已完成（含已删除的 Service 单测文件名，见一致性说明） | 模块说明 |
 | `backend/DISH_MODULE.md` | M-04 家庭菜品模块说明（分类/食材/步骤/图片/上下架） | 已完成（同上，见一致性说明） | 模块说明 |
 | `backend/CART_MODULE.md` | M-05 个人独立购物车模块说明 | 已完成（同上） | 模块说明 |
 | `backend/ORDER_MODULE.md` | M-06/M-07/M-08 家庭订单、备菜协作、采购清单模块说明 | 已完成（含"保留旧订单"等已过时描述，见一致性说明） | 模块说明 |
 | `frontend/FRONTEND_DESIGN.md` | 前端视觉方向、技术栈与主导航方案 | 技术栈与主导航已确认，页面细节按阶段细化 | 前端设计依据 |
-| `frontend/FRONTEND_DEVELOPMENT_ROADMAP.md` | 前端开发路线图（阶段 0 ~ 9，每阶段交付/验收/测试） | 阶段 0 已验收、阶段 1 已实现、阶段 2 起待逐阶段推进 | 前端实施依据 |
-| `frontend/FRONTEND_DEVELOPMENT_GUIDE.md` | 前端项目结构、真实后端能力、前端约束与历史文档差异 | 持续更新（阶段 0 已验收；阶段 1 框架已实现，视觉待人工验收） | 前端开发与联调导航 |
+| `frontend/FRONTEND_DEVELOPMENT_ROADMAP.md` | 前端开发路线图（阶段 0 ~ 9，每阶段交付/验收/测试） | 阶段 0~7 及 3 个对齐入口（成员移除/改角色、采购清单编辑、菜品删除）已实现，`npm run build` 通过；阶段 8/9 待推进 | 前端实施依据 |
+| `frontend/FRONTEND_DEVELOPMENT_GUIDE.md` | 前端项目结构、真实后端能力、前端约束与历史文档差异 | 持续更新（阶段 0~7 及 3 个对齐入口已实现，视觉待人工验收） | 前端开发与联调导航 |
 
 ---
 
@@ -87,7 +87,7 @@
 
 ### 2.9 `report/DECISION_LOG.md`
 
-- **作用**：记录项目关键技术决策（D-001 ~ D-024）。
+- **作用**：记录项目关键技术决策（D-001 ~ D-025）。
 - **何时读**：理解"为什么这么选"时；做出新决策前避免与历史冲突。
 - **性质**：项目级决策依据 + 历史记录（不覆盖，只追加）。
 
@@ -167,7 +167,7 @@
 
 - **作用**：前端开发路线图，划分阶段 0 ~ 9，每阶段含交付物、验收标准、测试要求与依赖。
 - **何时读**：每个前端阶段开始前、验收时。
-- **性质**：前端实施依据。阶段 0 已验收、阶段 1 已实现、阶段 2 起逐阶段推进。
+- **性质**：前端实施依据。阶段 0~7 及 3 个对齐入口已实现，阶段 8/9（整体联调、测试部署演示）待推进。
 
 ### 2.23 `frontend/FRONTEND_DEVELOPMENT_GUIDE.md`
 

@@ -21,5 +21,7 @@ public class ShoppingItemResponse {
     private Long orderId;
     private Long orderItemId;
     private Long addedBy;
+    private Boolean purchased;
+    private LocalDateTime purchasedAt;
     private LocalDateTime createdAt;
 }

@@ -13,5 +13,7 @@ public interface FamilyMemberRepository extends JpaRepository<FamilyMember, Long
     List<FamilyMember> findByFamilyIdAndLeftAtIsNull(Long familyId);
     List<FamilyMember> findByFamilyIdInAndLeftAtIsNull(List<Long> familyIds);
     Optional<FamilyMember> findByFamilyIdAndUserIdAndLeftAtIsNull(Long familyId, Long userId);
+    Optional<FamilyMember> findByFamilyIdAndUserId(Long familyId, Long userId);
     boolean existsByFamilyIdAndUserIdAndLeftAtIsNull(Long familyId, Long userId);
+    long countByFamilyIdAndRoleAndLeftAtIsNull(Long familyId, FamilyMember.FamilyRole role);
 }

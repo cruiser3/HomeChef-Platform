@@ -13,11 +13,12 @@
 | 类别 | 路径前缀 | 说明 | 前端是否使用 |
 |---|---|---|---|
 | 认证 | `/api/auth` | 注册、登录、签发 JWT | **使用** |
-| 家庭 | `/api/families` | 创建家庭、我的家庭列表、成员查询 | **使用** |
-| 菜品 | `/api/dishes` | 菜品库、分类、食材、步骤、上下架 | **使用** |
+| 用户资料 | `/api/users` | 查看/更新昵称、头像 URL、饮食偏好与忌口 | **使用** |
+| 家庭 | `/api/families` | 创建家庭、成员查询、邀请码、移除成员、修改角色 | **使用** |
+| 菜品 | `/api/dishes` | 菜品库、分类、食材、步骤、上下架、物理删除 | **使用** |
 | 购物车 | `/api/cart` | 个人独立购物车（用户+家庭隔离） | **使用** |
 | 家庭订单/备菜 | `/api/family-orders` | 下单、订单、备菜协作、开饭 | **使用** |
-| 采购清单 | `/api/shopping-list` | 记录实际缺少食材（最小范围） | **使用** |
+| 采购清单 | `/api/shopping-list` | 登记/查看/编辑/标记已购/删除 | **使用** |
 | 旧外卖 | `/api/restaurants`、`/api/menu-items`、`/api/orders`、`/api/chat` | 原项目遗留，无家庭隔离 | **不使用**（见第 8 节） |
 
 ---
@@ -107,6 +108,27 @@
 
 > 实现：`AuthService`（单一 `@Service` 类）。测试：`AuthServiceRegisterTest`、`AuthSecurityIntegrationTest`。
 
+### 2.3 用户资料与饮食偏好（`/api/users`，需登录）
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/users/me` | 查看当前用户资料 |
+| `PUT /api/users/me` | 更新当前用户昵称/头像 URL/饮食偏好/忌口 |
+
+请求体（`UpdateUserProfileRequest`）：
+```json
+{ "name": "张三", "avatarUrl": "https://...", "dietaryPreferences": ["FAT_LOSS", "VEGETARIAN"], "dietaryRestrictions": ["NO_SPICY", "NO_SEAFOOD"] }
+```
+- `name` 必填（≤50 字符）；`avatarUrl` 可选（≤500 字符，仅存 URL 字符串，不做文件上传）；`dietaryPreferences` 可选（最多 5 个，取值白名单：`FITNESS`/`FAT_LOSS`/`MUSCLE_GAIN`/`LIGHT_DIET`/`VEGETARIAN`，非法值 `400`）；`dietaryRestrictions` 可选（最多 5 个，忌口白名单：`NO_SPICY`/`NO_CILANTRO`/`NO_SEAFOOD`/`NO_BEEF_MUTTON`/`NO_PORK`/`NO_ALLIUM`，非法值 `400`）。
+
+响应 `200`（`UserProfileResponse`）：
+```json
+{ "id": 2, "name": "张三", "email": "zhang@example.com", "avatarUrl": "https://...", "dietaryPreferences": ["FAT_LOSS", "VEGETARIAN"], "dietaryRestrictions": ["NO_SPICY", "NO_SEAFOOD"] }
+```
+- 仅作用于当前登录用户，不存在越权修改他人的入口；饮食偏好与忌口均为白名单标签（忌口仅饮食习惯性质，不含过敏原等医疗信息），天然排除疾病/用药等敏感健康信息。
+
+> 实现：`UserProfileServiceImpl`。
+
 ---
 
 ## 3. 家庭模块（`/api/families`，需登录；除 `/current/members` 外不需要 `X-Family-Id`）
@@ -118,6 +140,11 @@
 | `GET /api/families/{familyId}` | 我的某家庭详情（非成员 403） |
 | `GET /api/families/{familyId}/members` | 成员列表（非成员 403） |
 | `GET /api/families/current/members` | 成员列表（改用 `X-Family-Id` 头，与上一条等价） |
+| `GET /api/families/{familyId}/invite-code` | 查看邀请码（成员） |
+| `POST /api/families/{familyId}/invite-code/reset` | 重置邀请码（管理员） |
+| `POST /api/families/join` | 凭邀请码加入家庭（需登录） |
+| `DELETE /api/families/{familyId}/members/{userId}` | 移除成员（管理员） |
+| `PUT /api/families/{familyId}/members/{userId}/role` | 修改成员角色（管理员） |
 
 ### 3.1 创建家庭
 `POST /api/families`，请求体：
@@ -140,7 +167,16 @@
 [ { "userId": 2, "name": "张三", "role": "ADMIN" } ]
 ```
 
-> 实现：`FamilyServiceImpl`。测试：`FamilyServiceImplTest`。**未实现邀请码加入、成员移除、改角色。**
+### 3.4 邀请码（M-03，已实现）
+- `GET /api/families/{familyId}/invite-code` → `200`（`InviteCodeResponse`）：`{ "inviteCode": "ABC23456" }`。仅成员可查，非成员 403。
+- `POST /api/families/{familyId}/invite-code/reset` → `200`（`InviteCodeResponse`）：重新生成 8 位邀请码。仅 `ADMIN` 可重置，非管理员 403。
+- `POST /api/families/join`，请求体 `{ "inviteCode": "ABC23456" }` → `200`（`FamilyResponse`）：凭邀请码加入家庭。邀请码无效 404；已在该家庭 409；曾退出者复用原成员记录并保留原角色。
+
+### 3.5 移除成员 / 修改角色（M-02 补充能力，已实现）
+- `DELETE /api/families/{familyId}/members/{userId}` → `204`。仅 `ADMIN` 可操作（非管理员 403）；不能移除自己（400）；目标是家庭最后一个管理员时拒绝（400）；移除采用软移除（记录 `leftAt`）并清空该成员在当前家庭的购物车，历史订单保留。
+- `PUT /api/families/{familyId}/members/{userId}/role`，请求体 `{ "role": "MEMBER" }` → `200`（`FamilyMemberResponse`）。仅 `ADMIN` 可操作；`role` 仅 `ADMIN`/`MEMBER`，非法 400；目标是家庭最后一个管理员且要降级为 `MEMBER` 时拒绝（400）。
+
+> 实现：`FamilyServiceImpl`。测试：`FamilyServiceImplTest`。**邀请码加入、成员移除、改角色均已实现。**
 
 ---
 
@@ -153,10 +189,11 @@
 | `GET /api/dishes/{dishId}` | 家庭成员 | 详情（含食材/步骤） |
 | `PUT /api/dishes/{dishId}` | 创建者本人 或 家庭 ADMIN | 修改（整体替换食材/步骤） |
 | `PATCH /api/dishes/{dishId}/availability?available=true` | 创建者本人 或 家庭 ADMIN | 上/下架 |
+| `DELETE /api/dishes/{dishId}` | 创建者本人 或 家庭 ADMIN | 物理删除（被历史订单引用时拒绝） |
 | `GET /api/dishes/categories` | 家庭成员 | 分类列表 |
 | `POST /api/dishes/categories` | 家庭成员 | 新建分类 |
 
-**没有删除菜品接口**（与 D-007"被引用菜品只能下架"一致）。
+物理删除规则：被历史订单引用（`family_order_items.dish_id`）的菜品 `409`，只能下架；未被引用的菜品级联删除其食材、步骤及购物车引用后物理删除。
 
 ### 4.1 创建 / 修改菜品
 `POST /api/dishes`、`PUT /api/dishes/{dishId}`，请求体（`DishRequest`）：
@@ -210,7 +247,10 @@
 - `POST /api/dishes/categories`，请求体 `{ "name": "热菜", "sortNo": 0 }` → `201`。重名 `400`。
 - **没有分类修改/删除接口。**
 
-> 实现：`DishServiceImpl`。修改/上下架权限由 `requireModifyPermission` 判定（创建者本人或家庭 ADMIN，否则 `403`）。测试：`DishServiceImplTest`。
+### 4.6 物理删除（已实现）
+`DELETE /api/dishes/{dishId}` → `204`。权限同修改（创建者本人或家庭 ADMIN，否则 `403`）。若菜品已被历史订单明细引用（存在 `dish_id` 引用），返回 `409`（`Dish has been referenced by historical orders...`），应改用下架；未被引用的菜品级联删除食材、步骤与购物车引用后物理删除。
+
+> 实现：`DishServiceImpl`。修改/上下架/物理删除权限由 `requireModifyPermission` 判定（创建者本人或家庭 ADMIN，否则 `403`）。测试：`DishServiceImplTest`。
 
 ---
 
@@ -349,6 +389,9 @@
 |---|---|---|
 | `GET /api/shopping-list` | 成员 | 清单列表（按创建倒序） |
 | `POST /api/shopping-list/items` | 成员 | 添加采购项 |
+| `PUT /api/shopping-list/items/{itemId}` | 成员 | 编辑采购项名称/数量/单位 |
+| `PATCH /api/shopping-list/items/{itemId}/purchased` | 成员 | 标记已购买/取消已购买 |
+| `DELETE /api/shopping-list/items/{itemId}` | 成员 | 删除采购项 |
 
 ### 7.1 添加采购项
 `POST /api/shopping-list/items`，请求体（`AddShoppingItemRequest`）：
@@ -367,7 +410,18 @@
 ### 7.2 清单列表
 `GET /api/shopping-list` → `200`（`ShoppingItemResponse[]`）。
 
-**没有"标记已购买/完成""删除""修改"接口**（最小范围，见 D-016）。
+### 7.3 编辑采购项
+`PUT /api/shopping-list/items/{itemId}`，请求体（`UpdateShoppingItemRequest`）：
+```json
+{ "name": "鸡蛋", "amount": 5.0, "unit": "个" }
+```
+- `name`/`amount`/`unit` 必填（`amount > 0`）；仅修改名称/数量/单位，不影响 `purchased`、`orderId` 等字段。响应 `200`（`ShoppingItemResponse`）。
+
+### 7.4 标记已购买
+`PATCH /api/shopping-list/items/{itemId}/purchased`，请求体 `{ "purchased": true }` → `200`（`ShoppingItemResponse`）。
+
+### 7.5 删除采购项
+`DELETE /api/shopping-list/items/{itemId}` → `204`（处理误添加的采购记录）。
 
 > 实现：`ShoppingListServiceImpl`。测试：`ShoppingListServiceImplTest`。
 

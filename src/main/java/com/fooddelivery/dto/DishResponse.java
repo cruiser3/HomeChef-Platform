@@ -26,6 +26,8 @@ public class DishResponse {
     private Long createdBy;
     private String createdByName;
     private boolean available;
+    private Double averageRating;
+    private Integer reviewCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<IngredientItem> ingredients;

@@ -6,8 +6,10 @@ import com.fooddelivery.dto.FamilyOrderResponse;
 import com.fooddelivery.dto.UpdateCookStatusRequest;
 import com.fooddelivery.entity.CartItem;
 import com.fooddelivery.entity.Dish;
+import com.fooddelivery.entity.FamilyMember;
 import com.fooddelivery.entity.FamilyOrder;
 import com.fooddelivery.entity.FamilyOrderItem;
+import com.fooddelivery.entity.FamilyShoppingItem;
 import com.fooddelivery.entity.User;
 import com.fooddelivery.exception.BadRequestException;
 import com.fooddelivery.exception.ForbiddenException;
@@ -17,6 +19,7 @@ import com.fooddelivery.repository.DishRepository;
 import com.fooddelivery.repository.FamilyMemberRepository;
 import com.fooddelivery.repository.FamilyOrderItemRepository;
 import com.fooddelivery.repository.FamilyOrderRepository;
+import com.fooddelivery.repository.FamilyShoppingItemRepository;
 import com.fooddelivery.repository.UserRepository;
 import com.fooddelivery.service.CurrentUserService;
 import com.fooddelivery.service.FamilyOrderService;
@@ -40,6 +43,7 @@ public class FamilyOrderServiceImpl implements FamilyOrderService {
 
     private final FamilyOrderRepository familyOrderRepository;
     private final FamilyOrderItemRepository familyOrderItemRepository;
+    private final FamilyShoppingItemRepository familyShoppingItemRepository;
     private final CartItemRepository cartItemRepository;
     private final DishRepository dishRepository;
     private final FamilyMemberRepository familyMemberRepository;
@@ -129,12 +133,14 @@ public class FamilyOrderServiceImpl implements FamilyOrderService {
 
     @Override
     public FamilyOrderResponse cancelOrder(Long familyId, Long orderId) {
-        currentUserService.requireMembership(familyId);
+        FamilyMember member = currentUserService.requireMembership(familyId);
         Long userId = currentUserService.getCurrentUserId();
         FamilyOrder order = requireFamilyOrder(familyId, orderId);
 
-        if (!order.getUserId().equals(userId)) {
-            throw new ForbiddenException("Only the order owner can cancel this order");
+        boolean isOwner = order.getUserId().equals(userId);
+        boolean isAdmin = member.getRole() == FamilyMember.FamilyRole.ADMIN;
+        if (!isOwner && !isAdmin) {
+            throw new ForbiddenException("Only the order owner or a family admin can cancel this order");
         }
         if (order.getStatus() == FamilyOrder.OrderStatus.CANCELLED) {
             throw new BadRequestException("Order is already cancelled");
@@ -152,6 +158,10 @@ public class FamilyOrderServiceImpl implements FamilyOrderService {
         order.setCancelledAt(LocalDateTime.now(ZoneOffset.UTC));
         order.setCancelledBy(userId);
         order.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+
+        // 取消联动：删除与该订单关联的采购清单项（U-004）
+        familyShoppingItemRepository.deleteAll(
+                familyShoppingItemRepository.findByFamilyIdAndOrderId(familyId, orderId));
 
         return toResponse(familyOrderRepository.save(order));
     }
@@ -184,8 +194,33 @@ public class FamilyOrderServiceImpl implements FamilyOrderService {
 
         order.setMealServed(true);
         order.setMealServedAt(LocalDateTime.now(ZoneOffset.UTC));
+        order.setStatus(FamilyOrder.OrderStatus.COMPLETED);
         order.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         return toResponse(familyOrderRepository.save(order));
+    }
+
+    @Override
+    public void deleteOrder(Long familyId, Long orderId) {
+        currentUserService.requireMembership(familyId);
+        FamilyOrder order = requireFamilyOrder(familyId, orderId);
+
+        if (order.getStatus() != FamilyOrder.OrderStatus.COMPLETED
+                && order.getStatus() != FamilyOrder.OrderStatus.CANCELLED) {
+            throw new BadRequestException("Only completed or cancelled orders can be deleted");
+        }
+
+        // 先删关联采购清单项（其外键引用本订单及订单明细，必须先行删除）
+        familyShoppingItemRepository.deleteAll(
+                familyShoppingItemRepository.findByFamilyIdAndOrderId(familyId, orderId));
+        familyShoppingItemRepository.flush();
+
+        // 再删订单明细
+        familyOrderItemRepository.deleteAll(
+                familyOrderItemRepository.findByOrderId(orderId));
+        familyOrderItemRepository.flush();
+
+        // 最后删订单
+        familyOrderRepository.delete(order);
     }
 
     @Override
@@ -220,11 +255,18 @@ public class FamilyOrderServiceImpl implements FamilyOrderService {
             throw new BadRequestException("Blocked reason is required when marking a dish as BLOCKED");
         }
 
+        boolean wasBlocked = item.getCookStatus() == FamilyOrderItem.CookStatus.BLOCKED;
+
         item.setCookStatus(target);
         item.setBlockedReason(target == FamilyOrderItem.CookStatus.BLOCKED ? request.getBlockedReason().trim() : null);
         item.setCookStatusUpdatedBy(userId);
         item.setCookStatusUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         familyOrderItemRepository.save(item);
+
+        // 正向联动：菜品从「缺食材」恢复时，自动把关联采购清单项标记为已采购
+        if (wasBlocked && target != FamilyOrderItem.CookStatus.BLOCKED) {
+            markRelatedShoppingItemsPurchased(familyId, orderItemId);
+        }
 
         order.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         familyOrderRepository.save(order);
@@ -251,6 +293,25 @@ public class FamilyOrderServiceImpl implements FamilyOrderService {
         familyOrderItemRepository.save(item);
 
         return toResponse(item.getOrder());
+    }
+
+    private void markRelatedShoppingItemsPurchased(Long familyId, Long orderItemId) {
+        List<FamilyShoppingItem> related = familyShoppingItemRepository
+                .findByFamilyIdAndOrderItemId(familyId, orderItemId);
+        if (related.isEmpty()) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        List<FamilyShoppingItem> toUpdate = related.stream()
+                .filter(item -> !item.isPurchased())
+                .peek(item -> {
+                    item.setPurchased(true);
+                    item.setPurchasedAt(now);
+                })
+                .toList();
+        if (!toUpdate.isEmpty()) {
+            familyShoppingItemRepository.saveAll(toUpdate);
+        }
     }
 
     private FamilyOrder requireFamilyOrder(Long familyId, Long orderId) {

@@ -1,0 +1,137 @@
+.shopping-page {
+  display: grid;
+  gap: 20px;
+}
+
+.shopping-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.shopping-head h1 {
+  margin: 4px 0 0;
+  font-size: clamp(24px, 4vw, 32px);
+}
+
+.shopping-list {
+  display: grid;
+  gap: 12px;
+}
+
+.shopping-item {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow-soft);
+}
+
+.shopping-item-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.shopping-item-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.shopping-item-amount {
+  color: var(--primary-dark);
+  font-weight: 650;
+}
+
+.shopping-item-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.shopping-item-order {
+  color: var(--text-secondary);
+}
+
+.shopping-item-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.shopping-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shopping-item.is-purchased .shopping-item-name {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.shopping-item.is-purchased {
+  opacity: 0.72;
+}
+
+.add-sheet,
+.unit-sheet,
+.order-sheet {
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+}
+
+.add-sheet h2,
+.unit-sheet h2,
+.order-sheet h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.add-sheet .van-field,
+.unit-sheet .van-field {
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.add-actions {
+  margin-top: 16px;
+}
+
+.shop-unit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.shop-unit-chip {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.shop-unit-chip:active {
+  background: var(--surface-soft);
+}
+
+.order-sheet .van-cell-group {
+  margin-bottom: 12px;
+  overflow: hidden;
+  border-radius: var(--radius);
+}

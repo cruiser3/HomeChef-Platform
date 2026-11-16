@@ -645,3 +645,190 @@
   - Playwright 浏览器启动：失败，原因是 Chromium 可执行文件缺失；未完成移动/桌面截图。
 - **最终结论**：阶段一布局与路由代码、自动化测试、构建和 SPA 路由 HTTP 检查已完成；响应式视觉人工验收待用户执行。阶段二未开始。
 - **是否经过人工审批**：用户明确要求开始阶段一；依赖及实现范围均在已确认的前端路线图内，无高风险后端或数据库操作。
+
+## 任务 018：家庭邀请码加入（M-03）实现与文档同步
+
+- **日期**：2026-11-15
+- **所处开发阶段**：后端开发 / 家庭模块 M-03（邀请码加入家庭）；文档同步
+- **使用的 AI 工具**：CodeBuddy（IDE 内置 AI 编程助手）
+- **模型名称和版本**：DeepSeek-V4 Pro（当前运行环境声明；精确版本号「待确认」）
+- **调用方式**：IDE 会话内阅读源码与文档，实现后端邀请码闭环与前端加入入口，并同步多份文档。
+- **任务目标**：实现「邀请码加入家庭」完整闭环——固定 8 位邀请码的生成/查看/重置/凭码加入，并将已实现内容如实同步到现有文档，区分「已实现 / 待验证 / 未实现」。
+- **输入的需求/设计文档与 Skill**：
+  - `AGENTS.md`、`docs/backend/BACKEND_PROGRESS.md`、`AUTH_FAMILY.md`、`docs/frontend/FRONTEND_DEVELOPMENT_ROADMAP.md`、`API_FRONTEND_CONTRACT.md`、`docs/database/MYSQL_DATABASE_DESIGN.md`、`docs/report/DECISION_LOG.md` 等。
+  - 需求来源：M-03（邀请码加入家庭），决策 D-008/D-025。
+- **AI 输出与代码修改范围**：
+  - 后端：`Family` 实体新增 `inviteCode`；`FamilyRepository` 新增 `findByInviteCode`；`FamilyMemberRepository` 新增 `existsByFamilyIdAndUserIdAndLeftAtIsNull` 与 `findByFamilyIdAndUserId`；新增 `InviteCodeResponse`、`JoinFamilyRequest` DTO；`FamilyServiceImpl` 新增固定 8 位邀请码生成（`SecureRandom` + 去易混字符集）与 `getInviteCode`/`resetInviteCode`/`joinFamily`；`FamilyController` 新增 `GET /api/families/{familyId}/invite-code`、`POST /api/families/{familyId}/invite-code/reset`、`POST /api/families/join`；Flyway `V4__add_family_invite_code.sql` 给 `families` 加 `invite_code` 列与唯一约束。
+  - 前端：`api/family.js`、`store/family.js`、`FamilyView.vue`、`FamilySelectView.vue` 及样式，实现邀请码展示/复制/重置与凭码加入。
+- **人工审查发现的问题**：需严格区分「已实现 / 待验证 / 未实现」，不得把编译通过等同于 HTTP 实测通过。
+- **实际测试命令与测试结果**：
+  - `mvn -q -DskipTests compile`：EXIT=0，编译通过。
+  - `npm --prefix frontend run build`：EXIT=0，构建通过。
+  - `read_lints`：仅 2 条既有 `@Repository` 冗余风格警告，无新增错误。
+  - Flyway V4 迁移与邀请码接口 HTTP 实测：未执行（待执行）。
+- **最终结论**：M-03 邀请码加入闭环已实现，前端入口已接入；Flyway V4 迁移与接口 HTTP 实测（查看/重置/加入/重复加入 409/非成员 403/非管理员 403）待执行。
+- **是否经过人工审批**：新增业务功能（后端接口、实体、DTO、Flyway V4 迁移）与前端入口；Flyway 迁移与 HTTP 实测属待人工审批/执行项。
+
+## 任务 019：M-09 与家庭成员/采购清单/菜品删除补充能力实现
+
+- **日期**：2026-11-15
+- **所处开发阶段**：后端开发 / 收尾补齐五个模块（M-09 用户资料与饮食偏好、家庭成员移除与角色修改、采购清单编辑、菜品物理删除）
+- **使用的 AI 工具**：CodeBuddy（IDE 内置 AI 编程助手）
+- **模型名称和版本**：DeepSeek-V4 Pro（当前运行环境声明；精确版本号「待确认」）
+- **调用方式**：IDE 会话内先做需求/源码调研并产出关键决策点，经用户逐项拍板后再编码，最后同步文档。
+- **任务目标**：补齐后端全部剩余业务能力——M-09 用户资料与饮食偏好、移除成员、修改家庭角色、采购清单编辑（完成/删除此前已实现）、菜品物理删除。
+- **输入的需求/设计文档与 Skill**：
+  - `AGENTS.md`、`docs/requirements/USER_STORIES_AND_ACCEPTANCE.md`、`docs/requirements/REQUIREMENT_CONTEXT.md`、`docs/backend/*`、`docs/database/MYSQL_DATABASE_DESIGN.md` 等。
+  - 需求来源：E-08（M-09）、E-02 隐含成员管理、E-07 采购清单完整能力、U-007/D-REQ-012 菜品删除规则。
+- **关键人工决策（拍板）**：
+  - 菜品物理删除：被历史订单引用的菜品拒绝删除（409，只能下架），未被引用的菜品级联删除食材/步骤/购物车引用。
+  - 移除成员：软移除（记录 `left_at`）+ 清空该成员在当前家庭购物车；不能移除自己；最后一个管理员保护。
+  - 修改角色：仅 `ADMIN`/`MEMBER`；最后一个管理员不能被降级。
+  - M-09：昵称 + 头像 URL（不做文件上传）+ 饮食偏好（白名单标签集合）。
+- **AI 输出与代码修改范围**：
+  - 迁移：`V5__add_user_profile.sql` 给 `users` 加 `avatar_url`、`dietary_preferences`。
+  - M-09：`User` 加 `avatarUrl`/`dietaryPreferences` 与 `DietaryPreference` 枚举；新增 `UserProfileResponse`/`UpdateUserProfileRequest`/`UserProfileService`/`UserProfileServiceImpl`/`UserController`（`GET`/`PUT /api/users/me`）。
+  - 家庭成员：`FamilyMemberRepository` 加 `countByFamilyIdAndRoleAndLeftAtIsNull`；新增 `UpdateMemberRoleRequest`；`FamilyService`/`FamilyServiceImpl`/`FamilyController` 加 `removeMember` 与 `updateMemberRole`。
+  - 采购清单：新增 `UpdateShoppingItemRequest`；`ShoppingListService`/`ShoppingListServiceImpl`/`ShoppingListController` 加 `updateItem`。
+  - 菜品删除：`FamilyOrderItemRepository` 加 `existsByDishId`、`CartItemRepository` 加 `deleteByDishId`；`DishService`/`DishServiceImpl`/`DishController` 加 `delete`。
+- **人工审查发现的问题**：需求规格 U-007 标记「物理删除待确认」、US-04-04 明确「本版不实现物理删除」；成员移除/改角色在需求规格中无对应 User Story——故先向用户说明冲突并取得四项拍板，未擅自决定业务规则。
+- **实际测试命令与测试结果**：
+  - `mvn -q -DskipTests compile`：EXIT=0，编译通过。
+  - `read_lints`：仅既有 `@Repository` 冗余风格警告，无新增错误。
+  - Flyway V5 迁移与各新增接口 HTTP 实测：未执行（待执行）。
+- **最终结论**：五个模块的代码均已实现并编译通过；Flyway V5 迁移与各新增接口 HTTP 实测待执行，严格区分「已实现 / 待验证」。
+- **是否经过人工审批**：四项业务规则（菜品删除、移除成员、角色保护、M-09 范围）均经用户逐项拍板后编码；Flyway V5 迁移属数据库结构变更，需人工审批后方可在目标库执行。
+
+## 任务 020：Flyway V4/V5 迁移核验 + 新增接口 HTTP 实测 + 测试数据清理
+
+- **日期**：2026-11-15
+- **所处开发阶段**：后端测试验证 / 数据库迁移核验与数据清理
+- **使用的 AI 工具**：CodeBuddy（IDE 内置 AI 编程助手）
+- **模型名称和版本**：DeepSeek-V4 Pro（当前运行环境声明；精确版本号「待确认」）
+- **调用方式**：IDE 会话内环境检查、源码核对、HTTP 实测脚本编写与执行、数据库迁移核验与测试数据清理。
+- **任务目标**：把此前「代码已实现、迁移与 HTTP 实测待执行」的收尾项落地——核验 Flyway V4/V5 是否已在目标库应用、对全部新增接口做真实 HTTP 实测（含负向用例）、实测完成后清理写入正式库的测试数据。
+- **输入的需求/设计文档与 Skill**：
+  - `AGENTS.md`（第 5.3 节高危操作审批：数据库删除须人工审批）
+  - `docs/backend/BACKEND_PROGRESS.md`、`docs/database/MYSQL_DATABASE_DESIGN.md`、`docs/report/DECISION_LOG.md`（D-024/D-025）
+  - 源码：`FamilyController`、`ShoppingListController`、`DishController`、`UserController`、新增 DTO（`UpdateUserProfileRequest`/`UpdateMemberRoleRequest`/`JoinFamilyRequest`/`UpdateShoppingItemRequest`/`UpdatePurchasedRequest`/`InviteCodeResponse`/`FamilyMemberResponse`）、`UserProfileServiceImpl`/`FamilyServiceImpl`/`ShoppingListServiceImpl`/`DishServiceImpl`、`GlobalExceptionHandler`（异常到状态码映射）
+  - 未使用 Skill。
+- **使用的提示词/任务规格（摘要）**：用户先批准「先做 Flyway V4+V5 迁移 + 后端新增接口实测」；核实迁移是否落库、补全 HTTP 实测脚本覆盖全部新增接口（M-09、成员移除/改角色、邀请码、采购清单编辑/标记已购/删除、菜品物理删除）及关键负向用例（400/401/403/404/409、最后管理员保护、跨家庭隔离）；实测结束后按用户指令清理测试数据（仅命中测试邮箱域名）。
+- **AI 输出与代码修改范围**：
+  - 新增：`docs/testing/new-api-http-verify.ps1`（39 项断言的 HTTP 实测脚本）。
+  - 更新：`docs/backend/BACKEND_PROGRESS.md`（M-03/M-09 状态、迁移核验、实测结果、维护记录）；`docs/report/` 三份报告文档（本文件、`DECISION_LOG.md`、`COURSE_REPORT_WORKLOG.md`）。
+  - 代码修改：**无**（未改任何 Java 源码、`pom.xml`、`application.properties`）。
+  - 数据库：删除测试数据（见下方审批说明）。
+- **人工审查发现的问题**：
+  1. **迁移早已应用**：启动日志显示 `Successfully validated 5 migrations`、`Current version of schema: 5`，随后用 `mysql` 客户端核验 `flyway_schema_history` 5 条全 success、`users` 表含 `avatar_url`/`dietary_preferences`，确认 V4/V5 并非本次新执行，而是此前 8080 端口上 18:26 启动的实例已迁移。
+  2. **8080 端口被占用**：重新打包的 JAR 因端口被已有后端实例（PID 43452）占用而启动失败；探测确认该实例已含最新代码（`M09_GET=200`），故直接复用运行中实例做实测，无需重启。
+  3. **PowerShell 脚本计数器作用域瑕疵**：首轮 `$script:Pass++` 在 `-File` 模式下汇总显示 `PASS=0 FAIL=0`，改为 `$global:` 后复验得到准确计数 39/39；逐条断言输出真实，属脚本显示问题而非接口缺陷。
+- **是否经过人工审批**：**是**。Flyway 迁移核验为只读操作；测试数据清理为数据库删除（高风险），已由用户明确批准（「清理掉吧」）后执行；未改动任何业务代码与表结构。
+- **实际测试命令与测试结果**：
+  - `mvn -q -DskipTests package` → 成功，生成最新 JAR。
+  - Flyway 核验：`mysql` 查询 `flyway_schema_history` → 5 条记录（V1~V5）全部 `success=1`；`SHOW COLUMNS FROM users` → 含 `avatar_url`、`dietary_preferences`。
+  - HTTP 实测：`powershell -ExecutionPolicy Bypass -File docs\testing\new-api-http-verify.ps1` → **PASS=39 FAIL=0**，覆盖 M-09（读写/非法偏好 400/空名 400/超 5 项 400）、成员移除/改角色（非管理员 403/最后管理员保护 400/移除自己 400/非法角色 400）、邀请码（查看/重置/凭码加入/无效码 400/重复加入 409）、采购清单（编辑/标记已购/标记未购/删除 204/再删 404/跨家庭 404）、菜品物理删除（非创建者 403/创建者 204/删后 404/被历史订单引用 409）。
+  - 测试数据清理：只读 dry-run 统计命中范围（测试用户 7、家庭 4、菜品 2、订单 2 等），随后单事务按外键依赖逆序删除；删除后复验测试数据全部归零、历史数据完好（用户 8、家庭 5 未受影响）。
+- **最终是否接受 AI 结果**：待人工确认。
+- **经验总结**：
+  - 「迁移待执行」这类结论不能只信文档，要以 `flyway_schema_history` 实际行数与表结构为准；本次 V4/V5 其实早已由运行中的实例应用，避免了一次无谓的重复迁移与重启。
+  - 数据库删除前先做「只读 dry-run 统计」并逐表核对命中数量与预期是否吻合，是防止误删真实数据的有效安全网。
+  - 按外键依赖逆序、单事务批量删除，既规避外键约束报错，又保证要么全删要么全不删。
+
+## 任务 021：前端补齐 3 个对齐入口（成员移除/改角色、采购清单编辑、菜品删除）
+
+- **日期**：2026-11-15
+- **所处开发阶段**：前端开发 / 前后端能力对齐
+- **使用的 AI 工具**：CodeBuddy（IDE 内置 AI 编程助手）
+- **模型名称和版本**：DeepSeek-V4 Pro（当前运行环境声明；精确版本号「待确认」）
+- **调用方式**：IDE 会话内前端源码核对、后端接口契约核对、代码生成与构建验证。
+- **任务目标**：后端已补齐成员移除/改角色、采购清单编辑/删除、菜品物理删除能力并 HTTP 实测通过；本次在前端补上对应入口，使前后端能力对齐。
+- **输入的需求/设计文档与 Skill**：
+  - `docs/frontend/FRONTEND_DEVELOPMENT_ROADMAP.md`（第 5 节接口约束、阶段 6/7）
+  - `docs/backend/BACKEND_PROGRESS.md`、`docs/backend/API_FRONTEND_CONTRACT.md`
+  - 后端源码：`FamilyController`、`ShoppingListController`、`DishController`，DTO `UpdateMemberRoleRequest`/`UpdateShoppingItemRequest`/`FamilyMemberResponse`/`ShoppingItemResponse`/`DishResponse`/`UserProfileResponse`/`FamilyResponse`
+  - 前端源码：`api/{family,shopping,dish,user}.js`、`store/{auth,family}.js`、`views/{FamilyView,ShoppingListView,DishDetailView}.vue`、`styles/family.css`
+  - 未使用 Skill。
+- **使用的提示词/任务规格（摘要）**：用户确认后端收尾已完成，指示「补前端 3 个入口（移除/改角色、采购清单编辑/删除、菜品删除），让前后端能力对齐」。
+- **AI 输出与代码修改范围**：
+  - `api/family.js`：新增 `removeMember`、`updateMemberRole`。
+  - `api/shopping.js`：新增 `updateShoppingItem`。
+  - `api/dish.js`：新增 `deleteDish`。
+  - `views/FamilyView.vue`：成员列表补「移除/改角色」入口；`isMe` 由姓名比对改为 userId 比对。
+  - `views/ShoppingListView.vue`：补「编辑」入口与编辑弹窗（复用单位选择器）。
+  - `views/DishDetailView.vue`：补「删除」入口（创建者或管理员可见）。
+  - `styles/family.css`：成员操作区样式。
+- **人工审查发现的问题**：
+  1. 当前用户 id 需通过 `getMyProfile()` 获取（`UserProfileResponse.id`），前端 store 未持久化 id，故在家庭页/菜品详情页各取一次；`isMe` 与「菜品创建者」判断由原先的姓名比对（不精确）改为 userId 比对（精确）。
+  2. 前端隐藏按钮仅为体验优化，后端仍强制校验（移除/改角色限管理员、最后管理员保护、菜品删除限创建者或管理员、被订单引用 409），不依赖前端权限。
+- **是否经过人工审批**：本次为前端业务代码新增 UI 入口，属用户明确指令的「前后端对齐」任务；未改动后端、数据库与鉴权。
+- **实际测试命令与测试结果**：`npm run build`（`cd frontend`）→ 成功（398 modules，`built in 731ms`）；`read_lints` 无错误。
+- **最终是否接受 AI 结果**：待人工确认（UI 交互需浏览器人工验收，本次未启动浏览器实测）。
+- **经验总结**：
+  - 前后端对齐前先核对后端 Controller/DTO 的真实字段（如 `createdBy`、`currentUserRole`、`UserProfileResponse.id`），避免前端用不存在的字段或靠姓名等不稳定字段判断身份。
+  - 权限相关入口遵循「前端隐藏是体验、后端校验是底线」，前端不因隐藏按钮而省略后端 403/400/409 处理。
+
+---
+
+## 任务 022：前端阶段 8 整体联调、异常处理与响应式适配
+
+- **日期**：2026-11-15
+- **所处开发阶段**：前端开发 / 阶段 8（整体联调与响应式适配）
+- **使用的 AI 工具**：CodeBuddy（IDE 内置 AI 编程助手）
+- **模型名称和版本**：DeepSeek-V4 Pro（当前运行环境声明；精确版本号「待确认」）
+- **调用方式**：IDE 会话内逐模块前端源码审查、后端权限规则核对、代码补丁与构建验证。
+- **任务目标**：按路线图阶段 8 完成逐模块回归、统一异常/加载/空态、防重复提交、跨设备响应式适配、权限边界复核。
+- **输入的需求/设计文档与 Skill**：
+  - `docs/frontend/FRONTEND_DEVELOPMENT_ROADMAP.md`（阶段 8 与第 5 节接口约束）
+  - `docs/backend/API_FRONTEND_CONTRACT.md`
+  - 后端源码：`FamilyOrderController`（订单删除仅限 `COMPLETED`/`CANCELLED`）、`DishController`（编辑/上下架/删除限创建者或 ADMIN）
+  - 前端源码：`api/request.js`（拦截器对 `fieldErrors` 静默、无 `fieldErrors` 才弹 toast）、`views/*`、`styles/*`
+  - 未使用 Skill。
+- **使用的提示词/任务规格（摘要）**：用户指示「那先做阶段 8（整体联调/响应式适配）吧」，按路线图逐项推进。
+- **AI 输出与代码修改范围**（纯前端，未改后端/数据库/鉴权）：
+  - `CartView.vue`：补 loading/错误重试、删除/清空防重复提交（`removingId`/`clearing` 守卫）。
+  - `FamilySelectView.vue`：补 `loadError` 重试块。
+  - `OrderDetailView.vue`：移除 `authStore` 依赖，改由 `/api/user/me` 取真实用户 id；`confirmBlock` 防重；补错误重试。
+  - `DishDetailView.vue`：编辑/上下架/删除按钮统一加 `canManage`（创建者或管理员）门禁；补错误重试。
+  - `DishEditView.vue`：提交/新建分类 catch 处理 `error.fieldErrors` 弹出首条字段错误；补错误重试。
+  - `DishListView.vue`：成员贡献视图补 `loadError` 重试。
+  - `FamilyView.vue`：邀请码加载失败重试；改角色/移除成员防重。
+  - `ProfileView.vue`：`onSave` catch 处理 `fieldErrors`。
+  - `OrderListView.vue`：`onDelete` 加 `if (deletingId.value) return` 守卫。
+  - `styles/{dish,cart,family}.css`：补 767px/380px 断点（食材行堆叠、单位 6 列→3/2 列、购物车项两行布局、成员操作区换行）。
+- **人工审查发现的问题**：
+  1. `request.js` 拦截器对 `fieldErrors` 静默（仅页面自处理），`DishEditView`/`ProfileView` 提交错误原先无提示，已补字段级 toast。
+  2. 菜品编辑/上下架/删除后端要求「创建者或 ADMIN」，前端原先未门禁，已统一 `canManage`。
+  3. 身份判断由不可靠的姓名匹配改为 `UserProfileResponse.id` 匹配。
+  4. 订单删除无需前端权限门禁（后端已按 `COMPLETED`/`CANCELLED` 校验），前端 `isDeletable` 与后端一致，未改动。
+- **是否经过人工审批**：纯前端业务 UI 补丁，未触发高风险操作审批。
+- **实际测试命令与测试结果**：`cd frontend && npm run build` → 成功（398 modules，`built in 728ms`）；`read_lints` 无错误。端到端实测与手机局域网实测未执行，待人工启动前后端验证。
+- **最终是否接受 AI 结果**：待人工确认（端到端联调、手机/桌面视觉与局域网访问需实际运行验收）。
+- **经验总结**：
+  - 统一错误处理要区分「拦截器统一弹 toast」与「`fieldErrors` 需页面自处理」两条路径，否则字段级错误会被吞掉。
+  - 权限边界复核必须对照后端 Controller 真实规则，避免前端过度或不足门禁。
+  - 响应式断点应优先覆盖编辑表单的 grid 多列布局（食材行、单位网格）与列表项操作区，这些在窄屏最易溢出。
+
+---
+
+## 任务 023：忌口 + 下单自动备注（用户资料饮食偏好延伸）
+
+- **日期**：2026-11-15
+- **所处开发阶段**：后端 + 前端 / 用户资料与饮食偏好延伸（忌口与下单备注）
+- **使用的 AI 工具**：CodeBuddy（IDE 内置 AI 编程助手）
+- **模型名称和版本**：DeepSeek-V4 Pro（当前运行环境声明；精确版本号「待确认」）
+- **调用方式**：IDE 会话内先做需求/源码调研，产出 4 个关键决策点，经用户逐项拍板后再编码，最后同步文档。
+- **任务目标**：在已实现的「用户资料与饮食偏好」基础上，新增「忌口」白名单标签，并在下单时把忌口自动带入订单备注（前端预填、可见可编辑）。
+- **输入的需求/设计文档与 Skill**：`AGENTS.md`（6.7 健康信息约束）、`docs/README.md`、`docs/frontend/FRONTEND_DEVELOPMENT_ROADMAP.md`、`docs/requirements/REQUIREMENT_CONTEXT.md`；后端 `User`/`UserProfileServiceImpl`/`UpdateUserProfileRequest`/`UserProfileResponse`/`CreateFamilyOrderRequest`/`FamilyOrder`/`FamilyOrderServiceImpl`；前端 `ProfileView.vue`/`CartView.vue`/`api/user.js`/`store/auth.js`。未使用 Skill。
+- **使用的提示词/任务规格（摘要）**：用户确认四项——语义仅忌口（非医疗）、存储扩展白名单标签、下单前端预填、合并追加到备注末尾；AI 据此落地为独立字段 + 独立枚举 + Flyway V7 迁移 + 前端 chip 与备注预填。
+- **关键人工决策（拍板）**：4 项（语义边界、存储方式、自动备注方式、合并规则，均经用户逐项确认）。
+- **AI 输出与代码修改范围**：
+  - 后端：`V7__add_dietary_restrictions.sql`（`users` 加 `dietary_restrictions`）；`User` 加 `dietaryRestrictions` 字段与 `DietaryRestriction` 枚举；`UpdateUserProfileRequest`/`UserProfileResponse` 加 `dietaryRestrictions`；`UserProfileServiceImpl` 重构为通用 `serializeEnumList`（泛型枚举白名单校验）与 `parseCsv`。
+  - 前端：新增 `constants/dietary.js`（`PREFERENCES`/`RESTRICTIONS` + `restrictionsToText`）；`ProfileView.vue` 加「忌口」chip 组；`CartView.vue` 下单读 profile 预填备注并提示；`styles/cart.css` 加提示样式。
+- **人工审查发现的问题**：忌口需与偏好分开展示、下单只取忌口部分，故不宜复用 `dietary_preferences` 字段，需新增独立字段与迁移。
+- **是否经过人工审批**：**是**。四项业务规则经用户逐项拍板后编码；Flyway V7 属数据库结构变更，运行时执行需人工审批/重启。
+- **实际测试命令与测试结果**：`mvn -o compile -DskipTests` → BUILD SUCCESS；`cd frontend && npm run build` → built in 707ms（401 modules）；`read_lints` 0 错误。Flyway V7 迁移与 Hibernate validate、HTTP 实测（忌口读写、下单备注预填）未执行，待重启后端。
+- **最终是否接受 AI 结果**：待人工确认。
+- **经验总结**：
+  - 语义边界要在编码前明确：把「过敏（医疗）」与「忌口（习惯）」区分开，既满足需求又守住敏感健康信息红线。
+  - 两类标签需要「分组展示 + 分别取值」时，应分开存字段，而不是塞进同一字段靠前缀区分。
+  - 序列化/解析逻辑重复时，用泛型方法 + `Enum.valueOf` 抽取白名单校验，比复制两份更不易出错。

@@ -21,6 +21,9 @@ public class Family {
     @Column(nullable = false, length = 50)
     private String name;
 
+    @Column(name = "invite_code", length = 16)
+    private String inviteCode;
+
     @Column(name = "created_by", nullable = false)
     private Long createdBy;
 

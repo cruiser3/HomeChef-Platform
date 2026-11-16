@@ -10,4 +10,8 @@ import java.util.List;
 public interface FamilyShoppingItemRepository extends JpaRepository<FamilyShoppingItem, Long> {
 
     List<FamilyShoppingItem> findByFamilyIdOrderByCreatedAtDesc(Long familyId);
+
+    List<FamilyShoppingItem> findByFamilyIdAndOrderItemId(Long familyId, Long orderItemId);
+
+    List<FamilyShoppingItem> findByFamilyIdAndOrderId(Long familyId, Long orderId);
 }

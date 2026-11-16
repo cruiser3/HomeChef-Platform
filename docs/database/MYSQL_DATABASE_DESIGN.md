@@ -1,6 +1,6 @@
 # MySQL 数据库设计方案
 
-**文档状态：** 已完成 H2 到 MySQL 9.6.0 的首轮迁移。Flyway 10.10.0 已在 `homechef_platform` 成功应用 V1，Spring Boot 3.3.2 启动并通过 Hibernate `ddl-auto=validate`；核心注册、家庭、菜品、购物车、下单及历史快照 API 冒烟测试通过。Flyway 对 MySQL 9.6.0 的已验证范围警告、备份恢复、并发冲突、隔离与约束负向测试仍待补充
+**文档状态：** 已完成 H2 到 MySQL 9.6.0 的首轮迁移。Flyway 10.10.0 已在 `homechef_platform` 成功应用 V1，Spring Boot 3.3.2 启动并通过 Hibernate `ddl-auto=validate`；核心注册、家庭、菜品、购物车、下单及历史快照 API 冒烟测试通过。Flyway 对 MySQL 9.6.0 的已验证范围警告、备份恢复、并发冲突、隔离与约束负向测试仍待补充。另：邀请码加入（M-03）新增 Flyway V4 给 `families` 加 `invite_code` 列与唯一约束，用户资料与饮食偏好（M-09）新增 Flyway V5 给 `users` 加 `avatar_url`、`dietary_preferences` 列；V4/V5 迁移与接口 HTTP 实测待执行。
 **设计日期：** 2026-11-14
 **目标：** 记录 MySQL 目标结构、迁移实施和当前验证状态。
 **本轮迁移范围：** 正式库 `homechef_platform` 已由 Flyway V1 建立 11 张业务表；应用使用 Connector/J 9.7.0、Flyway Core/MySQL 10.10.0，Hibernate 使用 `validate`。Flyway 10.10.0 对 MySQL 9.6.0 的支持范围警告仍存在。迁移前 Flyway 13.12.2 与 Spring Boot 3.3.2 的兼容性失败记录保留在第 17 节，后续通过回到 Spring Boot BOM 管理的 Flyway 10.10.0 完成应用集成；H2 临时测试数据未导入。
@@ -21,7 +21,7 @@
 - 需求边界：[REQUIREMENT_CONTEXT.md](../requirements/REQUIREMENT_CONTEXT.md)
 - 接口与源码交叉参考：[API_FRONTEND_CONTRACT.md](../backend/API_FRONTEND_CONTRACT.md)
 
-当前代码没有 Invitation、个人资料/饮食偏好或采购项已购状态实体；本设计限定于 11 个现有实体，未新增这些未来/未完成业务表。需求上下文确认了邀请码机制方向，但有效期、使用次数等规则尚未确定，应另行设计。
+当前代码没有 Invitation 实体；邀请码加入（M-03）已实现，采用固定 8 位邀请码通过 `families.invite_code` 列表达（Flyway V4）。个人资料与饮食偏好（M-09）已实现，通过 `users` 新增 `avatar_url`、`dietary_preferences` 列表达（Flyway V5），未新建独立偏好表；采购项已购状态由 `family_shopping_items.purchased` 列表达。
 
 ### 1.1 当前数据库配置清点
 
@@ -31,7 +31,7 @@
 | 数据库连接 | MySQL `127.0.0.1:3306`，账号 `homechef_app`；应用配置可由 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD` 覆盖 | JDBC 连通、Flyway 迁移及应用启动已实际验证；未修改 MySQL 服务配置 |
 | JDBC 驱动 | MySQL Connector/J 9.7.0 runtime | 依赖树、构建、正式库 JDBC 连接和业务 API 均已验证 |
 | ORM | Spring Data JPA / Hibernate | 保留；迁移期间使用 schema validation |
-| Schema 管理 | Flyway 版本化迁移；Hibernate `validate` | V1 已成功应用，应用启动时 Hibernate 校验通过 |
+| Schema 管理 | Flyway 版本化迁移；Hibernate `validate` | V1 已成功应用，应用启动时 Hibernate 校验通过；V4 新增 `families.invite_code`、V5 新增 `users.avatar_url`/`dietary_preferences`（迁移待执行） |
 | 连接池 | JPA starter 使用 Spring Boot 默认池；项目未显式配置池参数 | HikariCP；给出后续起步建议，按部署连接预算复核 |
 | 初始数据 | 未发现项目级 SQL 种子数据脚本 | 用迁移脚本/独立初始化流程管理，不把示例数据混入结构迁移 |
 | 迁移工具 | Flyway Core/MySQL 10.10.0 | 正式库 V1 迁移成功，仍有 MySQL 9.6.0 超出 Flyway 已验证版本范围的警告 |
@@ -109,8 +109,8 @@ Flyway 13.12.2 曾在隔离 schema 成功读取 10.10.0 创建的 history 并执
 
 | 实体/表 | 当前用途与关键字段 | 当前关系现状 |
 |---|---|---|
-| `User` / `users` | 邮箱、密码哈希、姓名、系统角色、启用标记 | 邮箱唯一；家庭角色不在 User 中 |
-| `Family` / `families` | 家庭名称、创建者 ID、创建时间 | `createdBy` 是普通 Long，没有 JPA 外键 |
+| `User` / `users` | 邮箱、密码哈希、姓名、系统角色、启用标记、头像 URL、饮食偏好（V5 新增） | 邮箱唯一；家庭角色不在 User 中；饮食偏好存逗号分隔白名单标签 |
+| `Family` / `families` | 家庭名称、创建者 ID、创建时间、邀请码（`invite_code`，V4 新增，唯一） | `createdBy` 是普通 Long，没有 JPA 外键；`inviteCode` 是唯一字符串列 |
 | `FamilyMember` / `family_members` | 家庭 ID、用户 ID、家庭角色、加入时间 | 已有 `(family_id,user_id)` 唯一约束；两个 ID 都是普通 Long |
 | `Dish` / `dishes` | 家庭、名称、描述、图 URL、分类、耗时、单价、创建者、可用标记和时间 | family/category/creator 均为普通 Long |
 | `DishCategory` / `dish_categories` | 家庭、分类名、排序号 | 已有 `(family_id,name)` 唯一约束；家庭 ID 是普通 Long |
@@ -165,13 +165,17 @@ erDiagram
         bigint id PK
         string email UK
         string passwordHash
+        string name
         string role
         boolean active
+        string avatarUrl
+        string dietaryPreferences
     }
     FAMILY {
         bigint id PK
         bigint createdBy FK
         string name
+        string inviteCode UK
         datetime createdAt
     }
     FAMILY_MEMBER {
@@ -258,7 +262,7 @@ erDiagram
 - 所有 ID 使用 `BIGINT NOT NULL AUTO_INCREMENT`，外键列使用相同的有符号 `BIGINT`。
 - 下列 DDL 每个字段明确声明类型、NULL/NOT NULL、默认值与索引/约束。`COMMENT` 标出需要新增或和当前实体有差异的字段。
 - 时间采用 `DATETIME(6)`，由应用按 UTC 生成；`CURRENT_TIMESTAMP(6)` 仅作为直接 SQL 写入的兜底默认值。`updated_at` 由应用统一维护，不依赖 MySQL 隐式自动更新。
-- 本设计不新增购物清单“已购买”字段，也不新增邀请码或饮食偏好表。
+- 本设计不新增独立的邀请码表或饮食偏好表；邀请码与饮食偏好分别以 `families.invite_code`（V4）和 `users.avatar_url`/`users.dietary_preferences`（V5）列表达。
 
 ### 6.2 建议建库语句
 
@@ -289,6 +293,11 @@ CREATE TABLE users (
     CONSTRAINT chk_users_role CHECK (`role` IN ('CUSTOMER', 'RESTAURANT_OWNER', 'ADMIN')),
     CONSTRAINT chk_users_active CHECK (active IN (0, 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- V5 增量：用户资料与饮食偏好（M-09）
+-- ALTER TABLE users
+--     ADD COLUMN avatar_url VARCHAR(500) NULL,
+--     ADD COLUMN dietary_preferences VARCHAR(200) NULL;
 
 CREATE TABLE families (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -857,6 +866,8 @@ DB-01 至 DB-16 的数据库设计方向均已确认并采纳。DB-11 仅确认�
 - Flyway Core/MySQL 使用 Spring Boot BOM 管理的 10.10.0；移除 H2 运行依赖。
 - `application.properties` 使用 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD` 环境变量；未将密码写入 Git 跟踪文件。Hibernate 使用 `ddl-auto=validate`，Flyway 负责 DDL。
 - 新增并在空的 `homechef_platform` 执行 [V1__create_homechef_schema.sql](../../src/main/resources/db/migration/V1__create_homechef_schema.sql)，建立 11 张业务表、外键、唯一约束、索引、CHECK 约束和乐观锁列。
+- 邀请码加入（M-03）新增 [V4__add_family_invite_code.sql](../../src/main/resources/db/migration/V4__add_family_invite_code.sql)，给 `families` 增加 `invite_code` 列与唯一约束（该迁移尚未在目标库执行，待执行）。
+- 用户资料与饮食偏好（M-09）新增 [V5__add_user_profile.sql](../../src/main/resources/db/migration/V5__add_user_profile.sql)，给 `users` 增加 `avatar_url`、`dietary_preferences` 列（该迁移尚未在目标库执行，待执行）。
 - Entity/Service 映射实现 `FamilyMember.leftAt`、`FamilyOrderItem.familyId`、非空菜品引用、购物车/订单/明细 `@Version`、成员当前状态过滤和 UTC 时间写入；订单明细不再配置删除级联/orphan removal。
 - 注册及登录邮箱通过 trim + 小写规范化；购物清单输入金额添加最多两位小数校验。
 - 移除已不再使用的 H2 Console 安全放行项和全局 frame-options 关闭设置。
@@ -875,13 +886,15 @@ DB-01 至 DB-16 的数据库设计方向均已确认并采纳。DB-11 仅确认�
 | 菜品/购物车/订单 | 菜品及食材/步骤创建通过；同菜购物车行合并并重新计算金额通过 |
 | 订单历史/事务 | 提交订单创建快照并清空已提交购物车；菜品后续改名/改价未改变历史订单菜名/价格 |
 | 家庭隔离 | 非成员访问另一家庭的菜品列表和购物车均返回 403 |
-| 采购清单 | 新增食材及读取列表通过 |
+| 采购清单 | 新增食材及读取列表通过；编辑/标记已购/删除为本次新增能力，HTTP 实测待执行 |
 | 金额精度 | DTO 单元测试验证超过两位小数拒绝、两位小数接受 |
 
 ### 18.3 尚未完成和风险
 
 - Flyway 10.10.0 日志提示 MySQL 9.6.0 超过其已验证版本范围；本次完整 V1 实际成功，但不能将其描述为 Flyway 官方验证通过。
 - 未完成数据库约束拒绝用例、乐观锁冲突测试、下单事务故障回滚、并发购物车更新、成员退出/重入 HTTP 测试及备份恢复演练。
+- 邀请码加入（M-03）的 Flyway V4 迁移尚未在目标库执行，邀请码接口（查看/重置/凭码加入、重复加入 409、非成员 403、非管理员 403）HTTP 实测待执行。
+- 用户资料与饮食偏好（M-09）的 Flyway V5 迁移尚未在目标库执行；移除成员/修改角色、采购清单编辑/已购/删除、菜品物理删除等本次新增接口的 HTTP 实测待执行。
 - 订单取消需求与实现仍有差异：需求上下文允许家庭管理员取消本家庭订单，当前 Service 仅允许下单者取消。本轮未改变该业务规则或 Java 行为。
 - 当前测试账号、家庭、菜品、订单和采购项是测试数据，已写入 `homechef_platform`；不要将其误认为 H2 导入数据。后续可在经确认后清理/重置，但本轮未执行删除操作。
 - 本次迁移前目标库为空，未有既存业务数据需要迁移或备份；仍须在后续正式使用前补充 MySQL 备份与恢复演练。

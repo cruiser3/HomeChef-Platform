@@ -14,7 +14,7 @@
 | 基础仓库 | `manishxydev/food-delivery-backend`（外卖点餐后端） |
 | 项目形态 | 纯后端 REST API（原项目无前端） |
 | 二次开发方向 | 家庭内部使用的私厨点单与饮食协作系统 |
-| 当前阶段 | 后端核心模块及 H2→MySQL 9.6.0 首轮迁移已完成；前端阶段 0 已验收，阶段 1 基础框架已实现并通过自动化测试/构建，响应式视觉待人工确认；阶段 2 尚未实现 |
+| 当前阶段 | 后端 M-01~M-09 全部业务模块（含邀请码加入、用户资料与饮食偏好/忌口 + 下单自动备注、成员移除/角色修改、采购清单完整能力、菜品物理删除）及 H2→MySQL 9.6.0 迁移（Flyway V1~V5，忌口 V7 待迁移）已完成；新增接口 HTTP 实测 39/39 通过；前端阶段 0~7、3 个对齐入口（成员移除/改角色、采购清单编辑、菜品删除）及忌口/下单自动备注均已实现，`npm run build` 通过；阶段 8/9（整体联调、测试部署演示）与视觉细节待人工验收 |
 | 分析文档 | `docs/project-analysis/PROJECT_ANALYSIS.md`（已生成） |
 
 ## 2. 选题背景与目标
@@ -96,16 +96,16 @@
 ## 8. 核心模块实现情况
 
 - **后端状态**：家庭私厨核心业务已完成编码，并通过自动化测试与 HTTP 实测（详见 `docs/backend/BACKEND_PROGRESS.md` 第 2、4 节）：
-  - 用户注册与登录 JWT（M-01）、家庭管理（M-02）：见 `docs/backend/AUTH_FAMILY.md`。
+  - 用户注册与登录 JWT（M-01）、家庭管理（M-02，含邀请码查看/重置/凭码加入 M-03）：见 `docs/backend/AUTH_FAMILY.md`。
   - 家庭菜品库（M-04，含分类/食材/步骤/上下架）：见 `docs/backend/DISH_MODULE.md`。
   - 个人独立购物车（M-05）：见 `docs/backend/CART_MODULE.md`。
   - 家庭下单与订单明细（M-06）、备菜协作与开饭（M-07）、最小采购清单（M-08）：见 `docs/backend/ORDER_MODULE.md`。
-  - 未开始：邀请码加入家庭（M-03）、用户资料与饮食偏好（M-09）。
+  - 用户资料与饮食偏好（M-09）：昵称/头像 URL/饮食偏好（白名单标签），并扩展「忌口」白名单标签（独立字段 `dietary_restrictions`，Flyway V7）与下单自动备注（前端预填），见 `docs/backend/API_FRONTEND_CONTRACT.md` 第 2.3 节。
 - **前端历史记录**：2026-11-13 的过程记录记载阶段 0（工程初始化）、阶段 1（基础框架）和阶段 2（认证与家庭上下文）曾完成；本次检出时对应源码不在工作区，不能把历史记录当作当前代码状态：
   - 阶段 0：技术栈定稿 Vue3 + Vite + Vant + Axios；创建 `frontend/` 工程并安装依赖（`vue`/`axios`/`vite`/`@vitejs/plugin-vue`）；配置 `/api` 代理（`vite.config.js`，转发到 `localhost:8080`）；实测代理链路「前端→代理→后端」贯通（受保护接口返回 401）。
   - 阶段 1：引入 `vue-router@4` 并建立嵌套路由（`/` → `MainLayout` 父布局 + 五个子路由 `dishes/orders/cart/shopping/family` + 404）；落地设计令牌（`src/styles/tokens.css`：奶油白 `#FAF6EF`、浅绿主色 `#6B9E7C`、暖黄点缀 `#E8B04B`）与全局样式（`base.css`）；设计公共布局 `MainLayout.vue`（电脑端顶部导航 + 手机端底部五栏 TabBar，由单一数据源 `navItems` 驱动）；内置 SVG 图标组件 `NavIcon.vue` 与统一占位组件 `PagePlaceholder.vue`；创建五个空白占位页。实测：`npm run build` 成功、dev server 五个子路由与未知路由全部 200（history fallback 正常）、无头截图像素抽样确认移动端底栏/桌面端顶栏/背景色正确。业务页面（菜品/购物车/订单等）尚未编码，按 `FRONTEND_DEVELOPMENT_ROADMAP.md` 阶段 3 起逐模块开展。前后端交接文档见 `docs/backend/API_FRONTEND_CONTRACT.md`，前端设计见 `docs/frontend/FRONTEND_DESIGN.md`。
   - 阶段 2：引入 `pinia` 状态管理（`store/auth.js` 管 token/用户、`store/family.js` 管家庭列表与当前家庭，均持久化 localStorage）；`api/request.js` axios 实例 + 请求拦截器（自动附 `Authorization` 与 `X-Family-Id`）+ 响应拦截器（非登录接口 401 统一清空登录态并跳 `/login`）；`LoginView.vue` 登录/注册切换（字段级 + 通用错误）；`FamilySelect.vue` 家庭列表/切换/创建；`FamilyView.vue` 由占位页改为家庭选择 + 创建 + 退出；路由新增 `/login` 独立路由（脱离 MainLayout）与前置守卫（未登录 → `/login`，已登录访问 `/login` → `/dishes`）；`MainLayout.vue` 桌面顶导航加用户区 + 退出。实测：`npm run build` 成功、后端真实 HTTP 联调通过（注册 201 / 重复邮箱 409 / 错误密码 401 / 登录 200 / 创建家庭 201 / 带 `X-Family-Id` 访问 200 / 缺失 400）、未登录访问 `/dishes` 被重定向到 `/login`（无头截图哈希一致）。
-- **当前工作区前端状态（2026-11-15）**：阶段 0 已验收（构建、首页和用户实测 `/api/families` 经代理返回 HTTP 401）；阶段 1 已实现 Vue Router、五导航、设计令牌、响应式布局、通用展示组件和登录守卫骨架。`npm test` 3 项通过、`npm run build` 成功，七个路径的 SPA fallback 均返回 HTTP 200；因本机缺少 Playwright Chromium，手机/桌面视觉仍待人工确认。真实登录、Pinia 与业务页面尚未实现。
+- **当前工作区前端状态（2026-11-15）**：阶段 0~7（认证、家庭选择、菜品库、购物车、订单备菜、采购清单、家庭展示 + 邀请码加入）均已实现，并补齐 3 个对齐入口（成员移除/改角色、采购清单编辑、菜品删除）及忌口/下单自动备注（个人资料忌口 chip + 购物车备注预填），前后端能力已对齐，`npm run build` 通过；整体联调与视觉细节待人工验收（本机缺少 Playwright Chromium）。详细阶段推进见 `FRONTEND_DEVELOPMENT_ROADMAP.md` 与 `BACKEND_PROGRESS.md` 第 6 节。
 - 原项目已实现模块（仅供复用参考，非本次新实现）：
   - 用户认证（`AuthService`、`AuthController`）
   - 餐厅管理（`RestaurantServiceImpl`，写接口已冻结）
@@ -124,7 +124,7 @@
 |------|----------|
 | Maven 构建/测试 | **成功**（本轮 `mvn -B clean test`：3 项测试通过；`mvn -B -DskipTests package`：BUILD SUCCESS） |
 | MySQL 迁移与 ORM 校验 | **成功**（Flyway V1 成功；应用启动时 Hibernate `ddl-auto=validate` 通过） |
-| HTTP 冒烟测试 | **部分通过**（注册/登录/家庭/菜品/购物车/下单快照/购物车清理/家庭隔离/采购清单已实测；并发与数据库约束负向测试待补） |
+| HTTP 冒烟测试 | **通过**（注册/登录/家庭/菜品/购物车/下单快照/购物车清理/家庭隔离/采购清单已实测；新增接口 M-09/成员移除改角色/邀请码/采购清单编辑标记删除/菜品物理删除 39/39 通过；并发与数据库约束负向测试待补） |
 
 - **自动化测试**：历史原项目 `mvn clean test` 无测试类；迁移后当前测试集有 3 项并已通过，覆盖范围有限，不代表业务集成全覆盖。
 - **启动方式**：`mvn spring-boot:run` 曾失败（`NoClassDefFoundError: SpringApplication`），已改用 `java -jar` 方式成功启动；详见 `RUN_VERIFICATION.md`。
@@ -140,13 +140,13 @@
 
 ## 11. AI 工程化实践摘要
 
-- 已记录 17 项 AI 辅助任务；任务 017 记录当前工作区前端阶段 1 基础布局与路由实现，模型标识未由运行环境提供，响应式视觉待人工确认，详见 `AI_INTERACTION_LOG.md`。
+- 已记录 23 项 AI 辅助任务；任务 019 记录 M-09 用户资料与饮食偏好、成员移除/角色修改、采购清单完整能力、菜品物理删除的实现；任务 020 记录 Flyway V4/V5 迁移核验、新增接口 HTTP 实测（39/39）与测试数据清理；任务 021 记录前端补齐 3 个对齐入口（成员移除/改角色、采购清单编辑、菜品删除）；任务 022 记录前端阶段 8 整体联调与响应式适配；任务 023 记录忌口 + 下单自动备注（含 Flyway V7），详见 `AI_INTERACTION_LOG.md`。
 - 后续开发过程中的 AI 使用情况将按模板逐条追加。
 
 ## 12. 项目成果与不足
 
-- **当前成果**：原项目分析与基线记录、需求规格、家庭业务后端及 MySQL 9.6.0 首轮迁移已完成；前端阶段 0 已验收，阶段 1 基础框架实现并通过自动化测试/构建，视觉待人工确认；阶段 2 及后续业务模块尚未实现。
-- **当前不足**：前端业务页面尚未编码；邀请码加入家庭（M-03）、资料与饮食偏好（M-09）未实现；MySQL 并发、约束负向及备份恢复测试待补；订单管理员取消权限与需求有差异；Flyway 对 MySQL 9.6.0 的验证范围警告待评估。
+- **当前成果**：原项目分析与基线记录、需求规格、家庭业务后端（M-01~M-09 全部业务模块，含邀请码加入、用户资料与饮食偏好/忌口、成员移除/角色修改、采购清单完整能力、菜品物理删除）及 MySQL 9.6.0 首轮迁移已完成；新增接口 HTTP 实测 39/39 通过；前端阶段 0~7、3 个对齐入口（成员移除/改角色、采购清单编辑、菜品删除）及忌口/下单自动备注均已实现，前后端能力已对齐，`npm run build` 通过。
+- **当前不足**：前端阶段 8（整体联调/响应式）与阶段 9（最终测试/部署/演示准备）及人工浏览器验收待进行；MySQL 并发、约束负向及备份恢复测试待补；订单管理员取消权限与需求有差异；Flyway 对 MySQL 9.6.0 的验证范围警告待评估。
 
 ## 13. 后续优化方向
 
@@ -172,3 +172,8 @@
 > 维护记录：2026-11-15 更新第 1/8/11/12 节：核对当前检出中没有历史前端阶段 0~2 源码；按用户要求重建阶段 0 Vue/Vite JavaScript 骨架。构建和首页 200 已实测；后端未运行导致代理返回 502，未将阶段 0 标记为完成，阶段 1/2 未开始。
 > 维护记录：2026-11-15 更新第 1/8/12 节：用户启动前后端后提供 `/api/families` 经 Vite 代理返回 401 `Authentication required` 的实测结果；阶段 0 验收通过，阶段 1/2 尚未开始。
 > 维护记录：2026-11-15 更新第 1/8/11/12 节：实现前端阶段 1 Vue Router、五导航、响应式布局和通用组件；`npm test` 3 项通过、`npm run build` 成功、SPA 路由 HTTP 检查 7 路径均 200。Playwright Chromium 缺失，视觉验收待人工确认；真实登录和业务功能仍属后续阶段。
+> 维护记录：2026-11-15 更新第 1/8/11/12 节：实现家庭邀请码加入（M-03）——固定 8 位邀请码、查看限成员/重置限管理员、凭码加入（重复加入 409、曾退出者复用原记录保留角色），Flyway V4 给 `families` 加 `invite_code`；前端家庭页/家庭选择页接入邀请码展示、复制、重置与凭码加入。编译与 `npm run build` 通过，Flyway V4 迁移与接口 HTTP 实测待执行。
+> 维护记录：2026-11-15 更新第 1/8/11/12 节：完成后端全部剩余业务能力——M-09 用户资料与饮食偏好（昵称/头像 URL/饮食偏好白名单标签，Flyway V5 给 `users` 加 `avatar_url`/`dietary_preferences`）、家庭成员移除（软移除+清空购物车）与角色修改（最后管理员保护）、采购清单编辑、菜品物理删除（被历史订单引用拒绝、级联清理食材/步骤/购物车）。`mvn -q -DskipTests compile` 通过，Flyway V5 迁移与各新增接口 HTTP 实测待执行。
+> 维护记录：2026-11-15 更新第 1/9/11/12 节：核验 Flyway V4/V5 已在正式库应用（`flyway_schema_history` 5 条、`users` 含 `avatar_url`/`dietary_preferences`），对全部新增接口完成 HTTP 实测（39/39 通过，脚本 `docs/testing/new-api-http-verify.ps1`），并清理写入正式库的测试数据（仅命中测试邮箱域名，历史数据未受影响）。
+> 维护记录：2026-11-15 更新第 1/8/11/12 节：前端补齐 3 个对齐入口（家庭成员移除/改角色、采购清单编辑、菜品删除），前后端能力对齐，`npm run build` 通过；至此「核心业务功能」代码已前后端闭环，阶段 8/9（整体联调、测试部署演示）与人工浏览器验收待进行。
+> 维护记录：2026-11-15 更新第 1/8/11/12 节：扩展「忌口 + 下单自动备注」——`users` 新增 `dietary_restrictions`（Flyway V7）、`DietaryRestriction` 白名单枚举 6 值（不吃辣/香菜/海鲜/牛羊肉/猪肉/葱姜蒜），`GET/PUT /api/users/me` 请求/响应新增 `dietaryRestrictions`；前端个人资料页加「忌口」chip 组、购物车下单读 profile 预填备注「忌口：xxx」（可见可编辑）。后端 `mvn -o compile -DskipTests` 与前端 `npm run build` 均通过；Flyway V7 迁移与 HTTP 实测待重启后端验证。

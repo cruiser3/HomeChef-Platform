@@ -26,11 +26,14 @@ public class DishIngredient {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(nullable = false, precision = 10, scale = 2)
+    @Column(precision = 10, scale = 2)
     private BigDecimal amount;
 
-    @Column(nullable = false, length = 20)
+    @Column(length = 20)
     private String unit;
+
+    @Column(name = "amount_text", length = 100)
+    private String amountText;
 
     @Column(name = "sort_no", nullable = false)
     @Builder.Default

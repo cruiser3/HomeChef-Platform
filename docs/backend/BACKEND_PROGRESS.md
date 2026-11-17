@@ -41,8 +41,10 @@
 | M-07 | 备菜协作与开饭状态 | 已完成 | 单菜状态 `PENDING/COOKING/READY/SERVED/BLOCKED`，订单整体状态独立；详见 `ORDER_MODULE.md` |
 | M-08 | 食材不足与家庭采购清单 | 已完成 | `family_shopping_items` 按家庭隔离，登记/查看/编辑/标记已购/删除；见 `ORDER_MODULE.md` 第 11 节 |
 | M-09 | 用户资料与饮食偏好 | 已完成 | 昵称/头像 URL/饮食偏好（白名单标签）；Flyway V5 迁移已应用，HTTP 实测通过（含非法偏好/空名/超 5 项 400 校验） |
+| M-10 | AI 助手（菜谱结构化 + 购物车整餐分析） | 已完成 | L1 菜谱结构化（`/api/ai/parse-recipe`）+ L2 购物车整餐分析（`/api/ai/analyze-cart`）；本地 Ollama `qwen2.5:7b` 经 `RestClient` 后端代理；详见 `AI_MODULE_DESIGN.md` |
+| M-11 | 系统菜谱库 / 美食广场 | 已完成 | `SystemDish` 表族（V12 建表、V13 种子 10 分类）+ HowToCook 373 道纯规则导入（含封面图复制到本地 `uploads`、`amount_text` 原文保留）+ 分类/列表/详情/复制到我家接口（`SystemDishController`）；详见 `docs/food-square/` |
 
-### 2.0 当前数据表（11 个 JPA 实体）
+### 2.0 当前数据表（16 个 JPA 实体：12 家庭业务 + 4 系统菜谱）
 
 | 实体 | 对应表 | 说明 |
 |---|---|---|
@@ -53,12 +55,17 @@
 | `DishCategory` | `dish_categories` | 菜品分类（`(family_id, name)` 唯一约束） |
 | `DishIngredient` | `dish_ingredients` | 菜品食材 |
 | `DishStep` | `dish_steps` | 菜品制作步骤 |
+| `DishReview` | `dish_reviews` | 菜品评论（评分/回复，V8 建表、V9 加回复自引用） |
 | `CartItem` | `cart_items` | 购物车（`(user_id, family_id, dish_id)` 唯一约束） |
 | `FamilyOrder` | `family_orders` | 家庭订单主表 |
 | `FamilyOrderItem` | `family_order_items` | 订单明细（菜名/单价/小计快照、单菜备菜状态、负责人） |
 | `FamilyShoppingItem` | `family_shopping_items` | 家庭待购清单（按 `family_id` 隔离） |
+| `SystemDish` | `system_dishes` | 系统公共菜谱（美食广场，含 `cover_image_url`/`source_type`/`original_path`，V12 建表） |
+| `SystemDishCategory` | `system_dish_categories` | 系统菜谱分类（V13 种子 10 类） |
+| `SystemDishIngredient` | `system_dish_ingredients` | 系统菜谱食材（含 `amount_text` 原文、`is_optional` 可选标记） |
+| `SystemDishStep` | `system_dish_steps` | 系统菜谱制作步骤（含 `image_url` 步骤图） |
 
-以上 11 张表由 Flyway V1 建立（24 个外键、10 个唯一约束）；V4 为 `families` 新增 `invite_code` 列及唯一索引（唯一约束增至 11 个），V5 为 `users` 新增 `avatar_url`、`dietary_preferences` 列。应用在 Hibernate `ddl-auto=validate` 下启动通过；V4/V5 迁移已在正式库执行并核验（`flyway_schema_history` 5 条记录，`users` 表含 `avatar_url`、`dietary_preferences` 列）。完整 ER 图与 DDL 见 `docs/database/MYSQL_DATABASE_DESIGN.md`。
+家庭业务 11 张表由 Flyway V1 建立（24 个外键、10 个唯一约束）；V4 为 `families` 新增 `invite_code` 列及唯一索引（唯一约束增至 11 个），V5 为 `users` 新增 `avatar_url`、`dietary_preferences` 列，V8/V9 建立 `dish_reviews`（第 12 张家庭业务表）并加回复自引用。系统菜谱 4 表由 V12 建立、V13 种子 10 分类、V14 为家庭 `dish_ingredients` 新增 `amount_text` 列（系统菜谱食材表的 `amount_text` 自建表起即有）。应用在 Hibernate `ddl-auto=validate` 下启动通过。完整 ER 图与 DDL 见 `docs/database/MYSQL_DATABASE_DESIGN.md`。
 
 ### 2.1 原项目遗留代码
 
@@ -70,9 +77,9 @@
 
 后端剩余待办：
 
-1. M-01 ~ M-09 业务模块均已实现；剩余为测试与运维待办（见第 5 节与各模块文档）。
+1. M-01 ~ M-10 业务模块均已实现（含 AI 助手 L1/L2）；剩余为测试与运维待办（见第 5 节与各模块文档），AI 助手端到端 HTTP 实测待启动后端 + Ollama 后执行。
 
-前端开发进度见 `docs/frontend/FRONTEND_DEVELOPMENT_ROADMAP.md`（阶段 0 已验收、阶段 1 已实现、阶段 2 起待逐阶段推进）。
+前端开发进度见 `docs/frontend/FRONTEND_DEVELOPMENT_ROADMAP.md`（阶段 0~7 及对齐入口已实现，阶段 8/9 待推进）。
 
 ---
 
@@ -89,6 +96,7 @@
 | HTTP 冒烟测试 | 启动后真实请求 | 注册/登录/创建家庭/菜品（含食材步骤）/购物车合并计价/下单快照/提交后清空购物车/历史快照不受改名改价影响/家庭越权 403/采购清单新增与查询 均通过 |
 | Flyway V4/V5 迁移核验 | 后端重启 + `mysql` 查询 | `flyway_schema_history` 5 条记录（V1~V5 全 success）；`users` 表已含 `avatar_url`、`dietary_preferences` 列 |
 | 新增接口 HTTP 实测 | `docs/testing/new-api-http-verify.ps1`（MySQL 正式库） | M-09、移除成员/改角色（含最后管理员保护）、邀请码、采购清单编辑·标记·删除、菜品物理删除（含引用拒绝）共 **39 项断言全部通过（39 PASS / 0 FAIL）** |
+| AI 模块编译/构建 | `mvn -o -q clean compile -DskipTests` + `npm --prefix frontend run build` | 后端 BUILD SUCCESS，前端 403 modules 构建成功，lint 0 错误（AI 端到端 HTTP 实测待执行） |
 
 启动后端前必须设置环境变量（`application.properties`）：
 
@@ -130,3 +138,4 @@
 > 维护记录：2026-11-15 完成 M-09（用户资料与饮食偏好）、家庭成员补充能力（移除成员/修改角色，含最后管理员保护）、采购清单编辑、菜品物理删除（被历史订单引用拒绝、级联清理食材/步骤/购物车）；新增 Flyway V5（`users` 加 `avatar_url`、`dietary_preferences`）；`mvn -q -DskipTests compile` 通过，V5 迁移与各接口 HTTP 实测待执行。
 > 维护记录：2026-11-15 在 MySQL 正式库核验 Flyway V4/V5 迁移（`flyway_schema_history` 5 条、`users` 新增两列），并完成新增接口 HTTP 实测（39/39 通过，脚本 `docs/testing/new-api-http-verify.ps1`）。
 > 维护记录：2026-11-15 前端补齐 3 个对齐入口（家庭成员移除/改角色、采购清单编辑、菜品删除），使前后端能力对齐，`npm run build` 通过；至此后端 M-01~M-09 与前端阶段 0~7 + 对齐入口均已实现，阶段 8/9（联调、测试部署演示）与人工浏览器验收待进行。
+> 维护记录：2026-11-16 新增 M-10 AI 助手模块（L1 菜谱结构化 + L2 购物车整餐分析）：后端 `OllamaClient`/`AiRecipeService`/`AiCartAnalyzeService`/`AiController`/DTO/`AiServiceException`（6 新增 + 2 修改，不改 `pom.xml`），前端 `api/ai.js` + `DishEditView`/`CartView` 入口；后端 `mvn -o compile` 与前端 `npm run build` 通过，端到端 HTTP 实测待启动后端 + Ollama 后执行。

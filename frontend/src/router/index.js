@@ -24,6 +24,21 @@ const dishRoutes = [
   },
 ]
 
+const plazaRoutes = [
+  {
+    path: 'plaza',
+    name: 'plaza',
+    component: () => import('../views/SystemDishListView.vue'),
+    meta: { label: '广场', requiresAuth: true, requiresFamily: true },
+  },
+  {
+    path: 'plaza/:id',
+    name: 'system-dish-detail',
+    component: () => import('../views/SystemDishDetailView.vue'),
+    meta: { label: '菜谱详情', requiresAuth: true, requiresFamily: true },
+  },
+]
+
 const cartRoutes = [
   {
     path: 'cart',
@@ -76,7 +91,7 @@ const profileRoutes = [
 ]
 
 const moduleRoutes = mainNavigation
-  .filter((item) => !['dishes', 'cart', 'kitchen', 'shopping', 'family'].includes(item.name))
+  .filter((item) => !['dishes', 'plaza', 'cart', 'kitchen', 'shopping', 'family'].includes(item.name))
   .map((item) => ({
     path: item.path.slice(1),
     name: item.name,
@@ -91,6 +106,7 @@ const routes = [
     children: [
       { path: '', redirect: { name: 'dishes' } },
       ...dishRoutes,
+      ...plazaRoutes,
       ...cartRoutes,
       ...orderRoutes,
       ...shoppingRoutes,

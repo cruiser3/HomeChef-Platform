@@ -27,6 +27,7 @@ dist-ssr/
 
 # ===== 本地数据 / AI / IDE 工具配置，不上传 =====
 data/
+# uploads/ 是运行时生成的派生数据（含系统菜谱封面图），不入库；菜谱数据源 HowToCook/（md + 图片 + LICENSE）必须随仓库上传，切勿忽略
 uploads/
 .codebuddy/
 .trae/

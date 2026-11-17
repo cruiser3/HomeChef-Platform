@@ -7,6 +7,13 @@ export const mainNavigation = [
     icon: 'home',
   },
   {
+    name: 'plaza',
+    path: '/plaza',
+    label: '广场',
+    description: '浏览系统菜谱并复制到我家',
+    icon: 'plaza',
+  },
+  {
     name: 'kitchen',
     path: '/orders',
     label: '厨房',

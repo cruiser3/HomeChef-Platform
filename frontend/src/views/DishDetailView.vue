@@ -61,6 +61,18 @@ function formatTime(value) {
   })
 }
 
+function formatAmount(ingredient) {
+  if (ingredient.amount != null && ingredient.unit && ingredient.unit.trim()) {
+    return `${ingredient.amount} ${ingredient.unit}`
+  }
+  if (ingredient.amountText && ingredient.amountText.trim()) {
+    return ingredient.amountText
+  }
+  if (ingredient.amount != null) return String(ingredient.amount)
+  if (ingredient.unit) return ingredient.unit
+  return ''
+}
+
 async function loadDetail() {
   loading.value = true
   loadError.value = false
@@ -274,11 +286,15 @@ loadMyId()
       </button>
 
       <div class="dish-detail-media">
-        <van-image :src="dish.imageUrl || ''" fit="cover">
+        <van-image v-if="dish.imageUrl" :src="dish.imageUrl" fit="cover">
+          <template #loading>
+            <span class="dish-card-fallback">{{ dish.name?.charAt(0) || '菜' }}</span>
+          </template>
           <template #error>
             <span class="dish-card-fallback">{{ dish.name?.charAt(0) || '菜' }}</span>
           </template>
         </van-image>
+        <span v-else class="dish-card-fallback">{{ dish.name?.charAt(0) || '菜' }}</span>
         <span v-if="!dish.available" class="dish-card-badge">已下架</span>
       </div>
 
@@ -323,7 +339,7 @@ loadMyId()
         <ul class="dish-ingredient-list">
           <li v-for="(ingredient, index) in dish.ingredients" :key="index">
             <span class="dish-ingredient-name">{{ ingredient.name }}</span>
-            <span class="dish-ingredient-amount">{{ ingredient.amount }} {{ ingredient.unit }}</span>
+            <span class="dish-ingredient-amount">{{ formatAmount(ingredient) }}</span>
           </li>
         </ul>
       </section>

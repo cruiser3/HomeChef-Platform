@@ -353,6 +353,66 @@
 - **后续验证方式**：重启后端执行 V11 迁移并通过 Hibernate `validate`；HTTP 实测 `medicalConditions` 读写；`mvn -o compile -DskipTests` 与 `npm run build` 通过。
 - **决策状态**：已实现，等待用户审查；V11 迁移与运行时验证待执行。
 
+### D-028：AI 助手 L1 菜谱结构化（本地 Ollama，只回填草稿不直接建菜）
+
+- **日期**：2026-11-16
+- **决策背景**：核心业务前后端闭环后，落地 `AI_MODULE_DESIGN.md` 中 L1「粘贴菜谱 → 结构化」能力，作为增值入口挂在新建菜品页。
+- **当前问题**：(1) 本地小模型如何稳定输出可解析 JSON；(2) AI 调用走哪个 HTTP 客户端、如何不新增 Maven 依赖；(3) AI 是直接建菜还是只回填草稿；(4) 超时与失败如何降级。
+- **候选方案**：接口 A. Ollama 原生 `/api/chat`；B. OpenAI 兼容 `/v1/chat/completions`。HTTP A. 引入外部客户端依赖；B. 用 Spring 6.1 自带 `RestClient`。建菜 A. AI 直接创建菜品；B. AI 只返回草稿、回填表单、用户确认后走既有创建。失败 A. 单次失败即报错；B. 重试 2 次后降级。
+- **最终选择**：接口 A、HTTP B、建菜 B、失败 B。
+- **选择原因**：Ollama 原生 `format:"json"` 字段可强制 JSON 输出、最省事；`RestClient` 是 Spring Boot 3.3.2 自带的同步 HTTP 客户端，零依赖改动；AI 直接建菜会绕过表单校验与人工确认，回填草稿更安全可控；7b CPU 推理较慢且偶发不稳定，重试 2 次 + 失败抛 502 更稳。
+- **对项目的影响**：新增 `service/ai/OllamaClient`、`service/AiRecipeService`、`controller/AiController`、`dto/AiRecipeParseRequest/Response`、`exception/AiServiceException`；`GlobalExceptionHandler` 加 `AiServiceException` → 502；`application.properties` 加 `app.ai.*` 4 行配置。前端 `api/ai.js`（`parseRecipe` 覆盖 120s 超时）+ `DishEditView`「AI 智能识别」入口。
+- **后续验证方式**：`mvn -o -q clean compile -DskipTests` 与 `npm run build` 通过（已通过）；端到端 HTTP 实测（Ollama 在线/离线、非法 JSON 重试、`app.ai.enabled=false` 拒绝）待启动后端后执行。
+- **决策状态**：已实现，前端人工验证通过；端到端 HTTP 实测待执行。
+
+### D-029：AI 助手 L2 购物车整餐分析（健康档案默认不注入，需用户显式勾选）
+
+- **日期**：2026-11-16
+- **决策背景**：L1 通过后推进 L2，把「整餐营养分析」入口挂在购物车结算按钮之前，聚合当前家庭购物车菜品 + 食材给模型分析。
+- **当前问题**：(1) 是否在每次分析时注入用户健康档案（忌口/过敏/疾病）；(2) 购物车菜品 → 食材的聚合查询怎么实现；(3) 数据隔离与成员校验怎么做。
+- **候选方案**：健康档案 A. 默认注入；B. 默认不注入、前端勾选后才注入（`includeHealthProfile` 默认 false）。聚合 A. 新增 Repository 批量查询方法；B. 复用 `DishIngredientRepository.findByDishIdOrderBySortNoAsc` 循环查询。隔离 A. 信任前端 `familyId`；B. `requireMembership` 服务端校验。
+- **最终选择**：健康档案 B、聚合 B、隔离 B。
+- **选择原因**：健康信息默认不注入是 `AGENTS.md 6.7`「未经明确同意不得发送」的落地，用户勾选即显式同意；购物车菜品数量少，循环查食材的 N+1 可忽略，避免新增 Repository 方法；家庭数据隔离是硬约束，必须服务端 `requireMembership`，不信任前端传参。
+- **对项目的影响**：新增 `dto/AiCartAnalyzeRequest/Response`、`service/AiCartAnalyzeService`；`AiController` 加 `POST /api/ai/analyze-cart`（`@RequestHeader X-Family-Id` + 可空请求体）。前端 `api/ai.js`（`analyzeCart`）+ `CartView`「AI 整餐分析」入口（底部弹出面板，含「结合我的健康档案」勾选与免责声明）+ `styles/cart.css` 样式。
+- **后续验证方式**：`mvn -o -q clean compile -DskipTests` 与 `npm run build` 通过（已通过，403 modules）；端到端 HTTP 实测（购物车聚合、健康档案注入、缺失 `X-Family-Id` 400）待启动后端后执行。
+- **决策状态**：已实现，用户确认实现完成；端到端 HTTP 实测待执行。
+
+### D-030：HowToCook 系统菜谱全量批量导入（373 道、纯规则解析、ApplicationRunner 开关、幂等写入）
+
+- **日期**：2026-11-17
+- **决策背景**：系统菜谱库（美食广场）已完成数据库设计（Flyway V12 建 4 张表、V13 种子 10 分类）与接口模块设计（`SystemDishController` + `SystemDishService`），需把 HowToCook 仓库 373 道 Markdown 菜谱批量导入 `system_dishes` 表族，作为「系统公共菜谱」基础数据。
+- **当前问题**：(1) 373 道菜谱的「## 计算」食材用量格式不统一（数字+单位 / 份数公式 / 区间 / 多选 / 无数字），如何批量结构化；(2) 导入在何时、以何种方式触发；(3) 无法量化的用量如何处理；(4) 如何保证重复导入不产生脏数据。
+- **候选方案**：解析 A. 纯规则解析；B. 规则 + AI 兜底（复用 L1 Ollama `qwen2.5:7b` 离线批量结构化）。触发 A. 一次性离线脚本；B. `ApplicationRunner` + 配置开关。无法量化 A. 报错/跳过该食材；B. `amount`/`unit` 置空、原文存 `amountText`。幂等 A. 仅应用层先查再插；B. 数据库 `(source_type, original_path)` 唯一约束 + 应用层查重双兜底。
+- **最终选择**：解析 A、触发 B、无法量化 B、幂等 B。
+- **选择原因**：HowToCook 菜谱整体格式统一，纯规则可覆盖绝大多数「数字+单位」用例，并对区间/份数公式/多选/比例等显式识别后降级保留原文，避免对 373 道菜批量调用本地 7b 模型带来的耗时、不稳定与成本，且无需引入 AI 兜底的批量编排与人工抽检；`ApplicationRunner` 默认关闭，不影响正常启动，需要时显式开启即幂等导入，无需新增一次性脚本与人工运维；无法量化的用量降级为 `amountText` 原文、由「复制到我家」时人工补齐，既保证不丢信息、又不误标精确数值；数据库唯一约束 + 应用层 `existsBySourceTypeAndOriginalPath` 双重兜底，重复导入只会跳过已存在条目。
+- **对项目的影响**：新增 `service/importing/HowToCookMarkdownParser`（纯规则解析器）、`SystemDishImportService`（遍历 + 目录名映射分类 + 幂等写入）、`SystemDishImportRunner`（`ApplicationRunner`）三个类与 `HowToCookMarkdownParserTest`（7 例）；`application.properties` 新增 `app.system-dish.import.enabled=false`、`app.system-dish.import.howtocook-path=./HowToCook` 两行配置；每道菜的「菜谱 + 食材 + 步骤」在同一独立事务（`TransactionTemplate`）写入，单道失败不影响其它；不改动数据库/Flyway、既有实体/接口、认证授权、`pom.xml`。
+- **后续验证方式**：`HowToCookMarkdownParserTest` 7 例通过；真实导入 373 道（新增 373、跳过 0、未知分类 0、失败 0）；重启后端后核验 `/api/system-dish-categories`（10 分类）、`/api/system-dishes`（373 道）、搜索命中与详情字段、中文无乱码。
+- **决策状态**：已确定（导入已由用户执行成功；API 与数据库数据核验待后端重启后执行）。
+
+### D-031：HowToCook 解析器「计算」章节只解析列表项，并全量删除重导
+
+- **日期**：2026-11-17
+- **决策背景**：HowToCook 首批 373 道导入后发现食材中混入「说明文字」等脏数据（如「每次制作前需要确定计划做几份」被当成食材、`+ 猪肉` 的 name 带 `+` 前缀、Markdown 表格行 `|鸡蛋|1|个|` 被整行吞入）。
+- **当前问题**：(1)「计算」章节既有列表项食材，也有含数字的说明文字段落，原解析器对所有行都解析，导致说明文字被误判为食材；(2) 部分食材用 `+ ` 列表前缀，原正则 `^[-*]` 不识别，name 带 `+`；(3) 少量菜谱用 Markdown 表格写食材，无法用列表解析覆盖。
+- **候选方案**：解析 A. 精确跳过已知说明文字句子；B. 只解析列表项（`-`/`*`/`+` 开头），普通段落一律跳过。加号 A. 不处理；B. 纳入列表前缀正则。表格 A. 额外解析 Markdown 表格；B. 本次跳过、食材留空。重导 A. 全量删除旧 HOWTOCOOK 后重导；B. 增量修正。
+- **最终选择**：解析 B、加号 B、表格 B、重导 A。
+- **选择原因**：先写 Python 只读脚本统计出「计算」章节有 228 条非列表项含数字的说明文字（几十种变体），精确跳过不现实，而「食材必须是列表项」是稳定不变的格式约定，通用且正确；`+` 是合法列表前缀，纳入正则即可；Markdown 表格食材仅 2 个菜谱、属极小众格式，本次降级为空食材（宁缺毋滥、不产生 `|` 脏数据），后续按需单独处理；脏数据已落库，删除重导比增量修正更干净，且导入本身幂等。
+- **对项目的影响**：`HowToCookMarkdownParser` 计算章节增加 `line.matches("[-*+]\\s+.*")` 判断，列表前缀正则改为 `^[-*+]`；`HowToCookMarkdownParserTest` 新增 2 例（9 例全通过）；删除 373 条 HOWTOCOOK 后重导（新增 373、跳过 0、失败 0）。
+- **后续验证方式**：`mvn -o -Dtest=HowToCookMarkdownParserTest test` 9/9；重导后数据库三类脏数据（说明文字/`+` 前缀/`|` 表格）均 0、食材总数 2835；HTTP API `dishTotal=373`、`categoryCount=10`、搜索命中 7。
+- **决策状态**：已确定。
+
+### D-032：系统菜谱封面图采用「导入时复制到本地 uploads」，而非外链或新增代理接口
+
+- **日期**：2026-11-17
+- **决策背景**：美食广场需显示真实菜品图片。HowToCook 本地仓库含 353 张图片，但 markdown 中是相对路径（如 `./鸡蛋羹.jpg`），既有导入器只解析文字、丢弃图片，`cover_image_url` 全为 null。
+- **当前问题**：封面图以何种方式被前端访问；(2) 已导入的 373 道菜如何补上封面图。
+- **候选方案**：图片服务 A. 拼接 GitHub raw 外链；B. 导入时把封面图复制到本地 `uploads`，存 `/uploads` 路径；C. 后端新增图片代理接口。封面选择 A. 取第一张整行图片；B. 优先 alt 含「成品/预览」的整行图，否则第一张。回填 A. 单独写回填脚本；B. 导入器幂等逻辑升级为「已存在但无封面图则补齐」，重跑导入即回填。
+- **最终选择**：图片服务 B、封面选择 B、回填 B。
+- **选择原因**：B 复用项目现有 `/uploads` 静态映射（`WebConfig`）+ `SecurityConfig` 对 `/uploads/**` 的 `permitAll` + vite 代理，前端零改动、不依赖外网（GitHub 国内访问不稳定）、加载快；文件名按菜谱 id 确定（`sysdish-cover-<id>.<ext>`），重跑覆盖同一文件保证幂等。封面「成品/预览优先」避免把步骤图误作封面（如凉拌木耳第一张是步骤图）。回填复用既有导入入口，无需新增脚本，已存在记录只补封面、不重复插入。
+- **对项目的影响**：`HowToCookMarkdownParser` 新增 `coverImage` 解析与 `cleanImagePath`；`SystemDishImportService` 新增 `storeCoverImage`（复制图片到 `app.upload.dir`）与回填逻辑；`uploads/` 已被 `.gitignore` 忽略（运行时生成、不入库），而 `HowToCook/` 源数据（md + 图片 + LICENSE）需随项目提供以支持重新导入（已删除其嵌套 `.git` 避免 submodule 问题，并清理自带非菜谱配置 `.github`/`tips`/lint 配置/`package.json` 等；git 实测确认 `dishes` 与 `LICENSE` 不被忽略、可随仓库提交）。前端无需改动（`coverImageUrl` 有值后即显示真实图片，加载失败回退菜名）。
+- **后续验证方式**：`mvn clean test -Dtest=HowToCookMarkdownParserTest`（10 例全过）；用户开启 `app.system-dish.import.enabled=true` 重启后端回填后，核验 `cover_image_url` 落库、`uploads/sysdish-cover-*` 文件生成与前端图片显示。
+- **决策状态**：已确定（代码与单测已验证；真实回填待用户执行）。
+
 ---
 
 > 状态更新：2026-11-12 更新 D-001、D-005 的运行验证状态（`java -jar` 启动成功，`mvn spring-boot:run` 失败不作为成功依据）。
@@ -372,3 +432,7 @@
 > 状态更新：2026-11-15 前端补齐 3 个对齐入口（家庭成员移除/改角色、采购清单编辑、菜品删除），使此前已实现但前端缺口的后端能力与前端对齐，`npm run build` 通过；至此「核心业务功能」代码已前后端闭环，阶段 8/9（整体联调、测试部署演示）与人工浏览器验收待进行。
 > 状态更新：2026-11-15 新增 D-026（忌口独立字段与白名单枚举、下单备注前端预填；`users.dietary_restrictions` 由 Flyway V7 迁移，后端 `mvn -o compile -DskipTests` 与前端 `npm run build` 均通过，V7 迁移与 HTTP 实测待重启后端执行）。
 > 状态更新：2026-11-16 新增 D-027（收集疾病/健康情况标签，推翻第一版「不收集疾病用药」；`users.medical_conditions` 由 Flyway V11 迁移，预置 8 项 + 自定义，前端「健康情况」区块含免责声明；后端编译与前端构建通过，V11 迁移与 HTTP 实测待执行）。
+> 状态更新：2026-11-16 新增 D-028（AI 助手 L1 菜谱结构化：本地 Ollama `qwen2.5:7b` + Spring 6.1 `RestClient` + `format:json` 强制 JSON，只回填草稿不直接建菜，重试 2 次失败降级 502；后端 `mvn -o compile` 与前端 `npm run build` 通过，前端人工验证通过，端到端 HTTP 实测待启动后端后执行）。
+> 状态更新：2026-11-16 新增 D-029（AI 助手 L2 购物车整餐分析：健康档案默认不注入、前端勾选后注入，购物车食材复用 `findByDishIdOrderBySortNoAsc` 循环查询，`requireMembership` 家庭隔离校验；后端编译与前端构建通过，端到端 HTTP 实测待执行）。
+> 状态更新：2026-11-17 新增 D-030（HowToCook 系统菜谱全量批量导入：373 道、纯规则解析食材用量、`ApplicationRunner` 配置开关默认关闭、`(source_type, original_path)` 幂等去重、每道菜独立事务；导入已由用户执行成功「新增 373、跳过 0、失败 0」，API 与数据库数据核验待后端重启后执行）。
+> 状态更新：2026-11-17 新增 D-031（HowToCook 解析器「计算」章节只解析列表项、`+` 纳入列表前缀、表格食材本次降级为空；全量删除 373 条旧数据后重导「新增 373、跳过 0、失败 0」，数据库与 HTTP API 验证通过，说明文字/`+` 前缀/`|` 表格三类脏数据全部清零）。

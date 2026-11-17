@@ -832,3 +832,174 @@
   - 语义边界要在编码前明确：把「过敏（医疗）」与「忌口（习惯）」区分开，既满足需求又守住敏感健康信息红线。
   - 两类标签需要「分组展示 + 分别取值」时，应分开存字段，而不是塞进同一字段靠前缀区分。
   - 序列化/解析逻辑重复时，用泛型方法 + `Enum.valueOf` 抽取白名单校验，比复制两份更不易出错。
+
+---
+
+## 任务 024：AI 助手 L1 菜谱结构化（新建菜品页「AI 智能识别」）
+
+- **日期**：2026-11-16
+- **所处开发阶段**：后端 + 前端 / AI 助手增值模块（L1）
+- **使用的 AI 工具**：CodeBuddy（IDE 内置 AI 编程助手）
+- **模型名称和版本**：DeepSeek-V4 Pro（当前运行环境声明；精确版本号「待确认」）
+- **调用方式**：IDE 会话内先读 `AI_MODULE_DESIGN.md` 与后端源码确认现状，按「只回填草稿、不直接建菜」落地，最后同步文档。
+- **任务目标**：新建菜品页新增「AI 智能识别」入口，粘贴整段菜谱 → 后端调本地 Ollama `qwen2.5:7b` 结构化 → 回填菜名/食材/步骤到表单。
+- **输入的需求/设计文档与 Skill**：`AGENTS.md`（6.7 健康信息约束）、`docs/backend/AI_MODULE_DESIGN.md`、`docs/backend/BACKEND_PROGRESS.md`；后端 `SecurityConfig`/`GlobalExceptionHandler`/`BadRequestException`/`ErrorResponse`/`DishRequest`/`DishController`；前端 `DishEditView.vue`/`api/dish.js`/`api/request.js`。未使用 Skill。
+- **使用的提示词/任务规格（摘要）**：用户确认实现 L1；AI 据此落地为 `OllamaClient`（Spring `RestClient` + `format:json`）+ `AiRecipeService`（Java text block 提示词 + `ObjectMapper` 反序列化 + 重试 2 次）+ `AiController`（`/api/ai/parse-recipe`）+ `AiServiceException`（→ 502）。
+- **关键人工决策（拍板）**：3 项（原生 `/api/chat` 接口、零 Maven 依赖、AI 只回填草稿）。
+- **AI 输出与代码修改范围**：
+  - 后端：新增 `service/ai/OllamaClient`、`service/AiRecipeService`、`controller/AiController`、`dto/AiRecipeParseRequest/Response`、`exception/AiServiceException`；`GlobalExceptionHandler` 加 `AiServiceException` → 502；`application.properties` 加 `app.ai.*`（enabled/base-url/model/timeout-ms）4 行。
+  - 前端：新增 `api/ai.js`（`parseRecipe` 覆盖 axios 默认 10s 超时 → 120s，因 Ollama 首次加载模型约 13s）；`DishEditView.vue` 加「AI 智能识别」按钮 + 弹出面板 + 回填逻辑。
+- **人工审查发现的问题**：`request.js` 默认 axios 超时 10s 而 Ollama 首次推理约 13s，若不单独覆盖超时首次识别必超时；已用 `{ timeout: 120000 }` 处理。
+- **是否经过人工审批**：**是**。AI 模块属新增功能，用户明确授权实现 L1；`application.properties` 仅新增 4 行 AI 配置，未触碰数据库/认证。
+- **实际测试命令与测试结果**：`mvn -o -q clean compile -DskipTests` → BUILD SUCCESS（exitCode 0）；`npm --prefix frontend run build` → 403 modules 成功；`read_lints` 后端 5 文件 + 前端 2 文件 0 错误。阶段 0 预验证：本机 `qwen2.5:7b` 对菜谱结构化一次通过，输出 JSON 完全符合 schema（含「盐少许 → amount=0 + unit=少许」）。
+- **最终是否接受 AI 结果**：前端已在浏览器人工验证通过（用户确认）；端到端 HTTP 实测待启动后端 + Ollama 后执行。
+- **经验总结**：
+  - 本地小模型（7b）用 `format:"json"` 强制 JSON 输出，比「提示词里求 JSON」更可靠，配合 `ObjectMapper` + 重试可有效降低解析失败率。
+  - 超时是「调用外部服务」最容易被忽略的坑：默认 axios 超时短于模型冷启动时间，必须按能力覆盖。
+  - AI 只回填草稿、让用户确认后再走既有创建链路，既复用校验又守住「AI 不直接建菜」的边界。
+
+---
+
+## 任务 025：AI 助手 L2 购物车整餐分析
+
+- **日期**：2026-11-16
+- **所处开发阶段**：后端 + 前端 / AI 助手增值模块（L2）
+- **使用的 AI 工具**：CodeBuddy（IDE 内置 AI 编程助手）
+- **模型名称和版本**：DeepSeek-V4 Pro（当前运行环境声明；精确版本号「待确认」）
+- **调用方式**：IDE 会话内先读 `CartServiceImpl`/`CartController`/`CartItem`/`DishIngredient` 等源码确认现状，落地 `AiCartAnalyzeService`，最后同步文档。
+- **任务目标**：购物车页结算按钮之前新增「AI 整餐分析」入口，聚合当前家庭购物车菜品 + 食材，可选注入健康档案，返回整体评价/营养概况/搭配建议/注意事项。
+- **输入的需求/设计文档与 Skill**：`AGENTS.md`（6.1 家庭数据隔离、6.7 健康信息约束）、`docs/backend/AI_MODULE_DESIGN.md`；后端 `User`/`CartItem`/`CartItemRepository`/`DishRepository`/`DishIngredientRepository`/`CartServiceImpl`/`CurrentUserService`/`UserProfileServiceImpl`；前端 `CartView.vue`/`api/cart.js`/`api/user.js`/`constants/dietary.js`/`styles/cart.css`。未使用 Skill。
+- **使用的提示词/任务规格（摘要）**：用户确认实现 L2；AI 据此落地为 `AiCartAnalyzeService`（`requireMembership` 校验 → 购物车 + 菜品 + 食材聚合 → 可选健康档案注入 → `OllamaClient` 解析）+ `AiController` 新增 `/api/ai/analyze-cart`（`X-Family-Id` + 可空请求体）。
+- **关键人工决策（拍板）**：3 项（健康档案默认不注入需勾选、食材循环查询避免新增 Repository 方法、服务端家庭隔离校验）。
+- **AI 输出与代码修改范围**：
+  - 后端：新增 `dto/AiCartAnalyzeRequest/Response`、`service/AiCartAnalyzeService`；`AiController` 加 `POST /api/ai/analyze-cart`。
+  - 前端：`api/ai.js` 加 `analyzeCart`；`CartView.vue` 加「AI 整餐分析」按钮 + 底部弹出面板（含「结合我的健康档案」勾选、免责声明、重试）+ `styles/cart.css` 加 `.cart-ai`/`.ai-analyze-*` 样式。
+- **人工审查发现的问题**：健康档案 4 个字段均为逗号分隔字符串且可能含英文枚举（`DIABETES`/`NO_SPICY`），需在提示词注明「标签可能为英文枚举，请按语义理解」；`includeHealthProfile` 默认 false 实现「不勾选不注入」的合规落地。
+- **是否经过人工审批**：**是**。L2 属新增功能，用户明确授权实现；复用既有 Repository 方法、未改数据库表结构/认证授权。
+- **实际测试命令与测试结果**：`mvn -o -q clean compile -DskipTests` → BUILD SUCCESS（exitCode 0）；`npm --prefix frontend run build` → 403 modules 成功（CartView 7.12 kB）；`read_lints` 后端 2 文件 + 前端 3 文件 0 错误。
+- **最终是否接受 AI 结果**：用户确认实现完成；端到端 HTTP 实测（购物车聚合、健康档案注入、缺失 `X-Family-Id` 400）待启动后端 + Ollama 后执行。
+- **经验总结**：
+  - 敏感信息（健康档案）的合规边界要落在「默认不注入 + 显式勾选」上，而不是提示词里的一句免责声明。
+  - `requireMembership` 这类服务端隔离校验是所有「按家庭聚合数据」接口的第一道关卡，不能信任前端传参。
+  - 小数据量场景用循环查询换取「零 Repository 改动」是合理的工程取舍，但要在文档里明确 N+1 的边界与理由。
+
+---
+
+## 任务 026：HowToCook 系统菜谱批量导入（阶段 D）
+
+- **日期**：2026-11-17
+- **所处开发阶段**：后端开发 / 系统菜谱库（美食广场）批量导入（阶段 D）
+- **使用的 AI 工具**：CodeBuddy（IDE 内置 AI 编程助手）
+- **模型名称和版本**：DeepSeek-V4 Pro（当前运行环境声明；精确版本号「待确认」）
+- **调用方式**：IDE 会话内源码核对 + 编码 + 单元测试 + 编译验证，并指导用户执行真实导入。
+- **任务目标**：实现 HowToCook 仓库 373 道 Markdown 菜谱的批量导入，写入 `system_dishes` 表族；纯规则解析食材用量、`ApplicationRunner` 配置开关、幂等写入、每道菜独立事务。
+- **输入的需求/设计文档与 Skill**：
+  - `docs/food-square/HOWTOCOOK_DATA_ANALYSIS.md`（阶段 A~F 方案、第 3 节格式分析、第 7 节实施规划）
+  - `docs/food-square/SYSTEM_RECIPE_DATABASE_DESIGN.md`（V12/V13 表结构设计）
+  - `docs/food-square/SYSTEM_RECIPE_API_MODULE_DESIGN.md`（接口设计）
+  - 实际源码：`SystemDish`/`SystemDishIngredient`/`SystemDishStep`/`SystemDishCategory` 实体与对应 Repository、Flyway `V12`/`V13` 迁移、`SystemDishController`/`SystemDishService`、`application.properties`
+  - 未使用 Skill。
+- **使用的提示词/任务规格（摘要）**：全量 373 道（`template/` 不计入）；按 `#`/`##` 切分章节、难度取 `★☆` 数、卡路里取数字；食材「## 计算」用 `=`/`：`/`:` 或首个数字切分名称与用量，正则提取「数字+单位」，无法量化时 `amount`/`unit` 置空、原文存 `amountText`；步骤顶层有序项独立、缩进项并入父步骤并按顺序重排；以 `(source_type, original_path)` 幂等；`ApplicationRunner` + `@Value` 开关默认关闭；每道菜独立事务。
+- **AI 输出与代码修改范围**：
+  - 新增 Java（4 个）：`service/importing/HowToCookMarkdownParser.java`、`SystemDishImportService.java`、`SystemDishImportRunner.java`、`src/test/java/com/fooddelivery/service/importing/HowToCookMarkdownParserTest.java`（7 例）。
+  - 修改配置：`application.properties` 新增 `app.system-dish.import.enabled=false`、`app.system-dish.import.howtocook-path=./HowToCook` 两行。
+  - 未修改：数据库/Flyway 脚本、`SystemDish` 实体与 Repository、`SystemDishController`/`SystemDishService`、认证授权、`pom.xml`。
+- **人工审查发现的问题**：
+  1. 早前解析路径归一化用字符串前缀判断不够可靠，改为 `Path.relativize` 生成 `/` 分隔相对路径，与唯一键 `(source_type, original_path)` 口径一致。
+  2. 用户启动导入时终端出现中文乱码，经核验是 PowerShell 代码页 GBK 与 UTF-8 不一致导致，非 JDBC 写入数据问题（可用 `chcp 65001` 查看）。
+  3. `application.properties` 第 11 行 `spring.jpa.show-sql=true` 导致导入时 Hibernate SQL 大量刷屏，属既有配置、非本次引入；数据本身正确。
+- **是否经过人工审批**：新增导入代码属低风险（未改数据库结构、认证授权、既有业务）；真实导入由用户自行将 `app.system-dish.import.enabled` 置为 `true` 后启动执行，属用户显式操作。
+- **实际测试命令与测试结果**：
+  - `mvn -o -Dtest=HowToCookMarkdownParserTest test` → 7 例全部通过（标题/难度/卡路里/描述/食材量化/份数公式/区间/多选/可选标记/步骤子步骤/HTML 注释/缺标题）。
+  - `mvn -o compile -DskipTests` → BUILD SUCCESS。
+  - 真实导入（用户开启开关后启动）：`HowToCook 导入完成：新增 373，跳过(已存在) 0，跳过(未知分类目录) 0，失败 0`。
+  - API/数据库数据核验：待后端重启后执行（当前后端已停止，`netstat` 显示 8080 无监听）。
+- **最终是否接受 AI 结果**：导入结果已由用户确认成功；API 与数据库数据核验待后端重启后执行。
+- **经验总结**：
+  - 纯规则解析对「格式相对统一、规模中等」的数据比 AI 批量结构化更可控、更省时，且能显式覆盖并降级保留「无法量化」的边界情况，避免小模型幻觉产生错误精确值。
+  - 数据导入类任务应把「幂等」落到数据库唯一约束 + 应用层查重两层，而不是只靠一次性的脚本逻辑。
+  - 每道菜独立事务（`TransactionTemplate`）能隔离单道解析/写入失败，避免一条脏数据污染全量导入。
+  - 终端中文乱码要先区分「编码显示问题」与「数据写入问题」，不要误判为数据库损坏。
+
+---
+
+## 任务 027：修复 HowToCook 解析器误将说明文字解析为食材并全量删除重导
+
+- **日期**：2026-11-17
+- **所处开发阶段**：后端开发 / 系统菜谱库（美食广场）数据质量修复（阶段 D 复盘）
+- **使用的 AI 工具**：CodeBuddy（IDE 内置 AI 编程助手）
+- **模型名称和版本**：DeepSeek-V4 Pro（当前运行环境声明；精确版本号「待确认」）
+- **调用方式**：IDE 会话内先做决定性排查（Python 脚本统计格式分布），再改解析器 + 补单测，最后执行删除重导与多层验证。
+- **任务目标**：修复 HowToCook 导入后食材中混入「说明文字」（如「每次制作前需要确定计划做几份」）及 `+` 前缀、Markdown 表格 `|` 脏数据的问题，并全量删除重导、验证修复效果。
+- **输入的需求/设计文档与 Skill**：`docs/food-square/HOWTOCOOK_DATA_ANALYSIS.md`、`SYSTEM_RECIPE_DATABASE_DESIGN.md`（V12 表结构）；源码 `HowToCookMarkdownParser.java`、`SystemDishImportService.java`、`SystemDishImportRunner.java`、`SystemDishController.java`、`V12__create_system_recipe_schema.sql`。未使用 Skill。
+- **使用的提示词/任务规格（摘要）**：用户确认方案 A（删除旧数据 + 全量重导）。AI 先写 Python 排查脚本遍历 HowToCook，统计「计算」章节「非列表项但含数字」的行，确认说明文字是普通段落、食材是列表项后，把解析器改为「只解析 `-`/`*`/`+` 开头的列表项，普通段落跳过」。
+- **AI 输出与代码修改范围**：
+  - 修改（2 个 Java 文件）：`HowToCookMarkdownParser.java`（计算章节加列表项前缀判断、列表前缀正则 `^[-*]`→`^[-*+]`）；`HowToCookMarkdownParserTest.java`（新增说明文字跳过、加号列表前缀 2 例）。
+  - 修改配置：`application.properties` 导入开关 `true`→`false`（临时开启后还原）。
+  - 数据库：删除 373 条 HOWTOCOOK 数据（食材/步骤子表 → 主表）后重新导入。
+  - 未修改：Flyway 脚本、`SystemDish` 实体/Repository、`SystemDishController`/`SystemDishService`、认证授权、`pom.xml`。
+- **人工审查发现的问题**：
+  1. 用户首次执行删除 SQL 显示 `howtocook_remaining=0`，但重启导入却报「跳过(已存在) 373」；根因是 mysql 客户端会话未显式 `COMMIT`，退出时事务回滚，「删到 0」只是同会话假象。改为单条 `-e` 内显式 `COMMIT` 后，新连接确认 `remaining=0` 才真正生效。
+  2. PowerShell 不支持 `<` 输入重定向（`RedirectionNotSupported`），改用 `cmd /c` 或 `Get-Content | mysql`。
+  3. 含中文注释的 PowerShell 5.1 脚本在 UTF-8 无 BOM 下被误读导致登录 500（瞬时），改为纯 ASCII 脚本后验证通过——属脚本编码问题，非接口缺陷。
+- **是否经过人工审批**：**是**。删除 373 条 HOWTOCOOK 系统菜谱属数据库删除高风险操作，用户选择方案 A 已含删除重导意图；删除由用户执行、后由 AI 显式 `COMMIT` 复验完成，未改动表结构、认证授权与既有业务代码。
+- **实际测试命令与测试结果**：
+  - `mvn -o -Dtest=HowToCookMarkdownParserTest test` → `Tests run: 9, Failures: 0, Errors: 0`，BUILD SUCCESS。
+  - `mvn -o package -DskipTests` → 成功。
+  - 重导日志：`HowToCook 导入完成：新增 373，跳过 0，失败 0`。
+  - 数据库验证：`system_dishes` HOWTOCOOK=373；`system_dish_ingredients` 总数 2835；`name LIKE '%每次制作前%'`=0、`name LIKE '+%'`=0、`name LIKE '%|%'`=0。
+  - HTTP API 验证（`verify-api.ps1`）：`dishTotal=373`、`categoryCount=10`、搜索「西红柿」=7、鸡蛋花食材 4 条（修复前 5 条含 1 条脏数据）。
+- **最终是否接受 AI 结果**：待人工确认。
+- **经验总结**：
+  - 数据清洗前先写只读排查脚本统计格式分布，避免「逐个试」的低效，并让修复策略有数据依据（228 条说明文字、`+` 列表、表格行）。
+  - mysql 客户端交互式会话不自动提交，删除后必须显式 `COMMIT` 并用新连接复核，否则「删到 0」可能是未提交假象，导致重导被判为「已存在」。
+  - PowerShell 下脚本编码（UTF-8 无 BOM + 中文注释）会干扰执行，跨进程调用脚本应尽量纯 ASCII。
+
+---
+
+## 任务 028：美食广场前端（广场 Tab + 列表/详情/复制到我家）
+
+- **日期**：2026-11-17
+- **所处开发阶段**：前端开发 / 美食广场模块（阶段 10：导航与 API、列表页、详情页与复制）
+- **使用的 AI 工具**：CodeBuddy（IDE 内置 AI 编程助手）
+- **模型名称和版本**：Kimi-K3.1-Pro（当前运行环境声明；精确版本号「待确认」）
+- **调用方式**：IDE 会话内源码核对 + 编码 + `npm run build` 构建验证，小步推进（10-2 导航+API → 10-3 列表 → 10-4 详情+复制），每阶段交付后等待用户确认。
+- **任务目标**：实现美食广场前端——底部第 6 个 Tab「广场」、菜谱列表（分类筛选 + 搜索 + 卡片网格）、菜谱详情（封面/描述/食材含可选标记与 amountText/步骤/来源）、复制到我家（价格必填 + 缺失结构化用量食材的数量/单位补充，成功后跳转家庭菜品详情）。
+- **输入的需求/设计文档与 Skill**：后端 `SystemDishController`/`SystemDishServiceImpl`、`SystemDishDetailResponse`、`CopyToFamilyRequest`、`DishResponse`；前端现有 `navigation.js`/`router/index.js`/`TabBar.vue`/`dish` 模块与 `dish.css`/`base.css` 样式约定。未使用 Skill。
+- **使用的提示词/任务规格（摘要）**：按小步推进实现广场前端；列表接 `listSystemDishCategories`/`listSystemDishes`，详情接 `getSystemDish`，复制接 `copySystemDishToFamily`（`X-Family-Id` 由 axios 请求拦截器自动携带）。
+- **AI 输出与代码修改范围**：
+  - 修改：`navigation.js`（广场 Tab）、`router/index.js`（`plazaRoutes` 并从通用映射排除）、`components/TabBar.vue`（plaza 图标）、`styles/base.css`（移动端 TabBar 网格 5→6 列）、`style.css`（引入 systemDish.css）、`views/DishDetailView.vue`（食材 amountText 兜底 + 封面 loading 兜底）。
+  - 新增：`api/systemDish.js`、`views/SystemDishListView.vue`、`views/SystemDishDetailView.vue`、`components/SystemDishCard.vue`、`styles/systemDish.css`。
+- **人工审查发现的问题**：
+  1. 详情页 `van-image` 只写 `#error` 未写 `#loading`，无封面图时组件停在 loading 态显示默认灰色占位图标（用户截图反馈）；改为无封面图直接渲染菜名、有图时 loading/error 均回退菜名，并同步加固家庭详情页。
+  2. `difficulty` 字段因后端 `countStars` 统计 `★+☆` 总数导致几乎恒为 5，前端暂不展示（留待后续评估是否修后端并重导）。
+- **是否经过人工审批**：纯前端低风险改动，未触发高风险操作审批。
+- **实际测试命令与测试结果**：`npm run build` 通过（407 模块转换成功），`read_lints` 无错误。
+- **最终是否接受 AI 结果**：构建已验证；功能待人工浏览器验收。
+- **经验总结**：
+  - `van-image` 空 `src` 时停 loading 态，需同时提供 `#loading` 与 `#error` 插槽或用条件渲染兜底，否则显示默认占位图标。
+  - 新增底部 Tab 必须同步调整移动端 TabBar 的 `grid-template-columns` 列数。
+
+---
+
+## 任务 029：HowToCook 封面图解析与导入（复制到本地 uploads + 幂等回填）
+
+- **日期**：2026-11-17
+- **所处开发阶段**：后端开发 / 美食广场数据增强（阶段 D 延伸）
+- **使用的 AI 工具**：CodeBuddy（IDE 内置 AI 编程助手）
+- **模型名称和版本**：Kimi-K3.1-Pro（当前运行环境声明；精确版本号「待确认」）
+- **调用方式**：IDE 会话内源码核对 + 编码 + 单元测试 + `clean` 全量编译验证；真实回填由用户开启导入开关后重启后端执行。
+- **任务目标**：让广场显示真实菜品图片——解析 HowToCook markdown 封面图，导入时把图片复制到本地 `uploads` 并写入 `cover_image_url`，支持已有数据回填。
+- **输入的需求/设计文档与 Skill**：HowToCook 本地仓库（395 md + 353 图片）、现有导入器/解析器源码、`WebConfig`/`SecurityConfig` 的 `/uploads` 静态映射与放行机制、`vite.config.js` 代理。未使用 Skill。
+- **使用的提示词/任务规格（摘要）**：「在导入器里补充封面图解析并实现广场显示真实菜品图片」。
+- **AI 输出与代码修改范围**：
+  - 修改：`HowToCookMarkdownParser.java`（IMAGE 正则加捕获组、`ParsedDish` 加 `coverImage`、封面选择策略、新增 `cleanImagePath`）；`SystemDishImportService.java`（`@Value uploadDir`、`storeCoverImage`/`extensionOf`、`persist` 加封面、`importOne` 幂等升级为「已存在但无封面图则回填」、`ImportResult` 加 `coverBackfilled`）；`SystemDishImportRunner.java`（日志加回填数）；`HowToCookMarkdownParserTest.java`（新增 `parseCoverImage` 5 组断言）。
+  - 未修改：前端、数据库表结构、Repository（`findBySourceTypeAndOriginalPath` 已存在）、认证授权、`pom.xml`。
+- **人工审查发现的问题**：首次 `mvn test` 显示「Nothing to compile - all classes are up to date」（增量编译缓判定），改用 `mvn clean test` 强制全量编译确认导入器新逻辑编译正确。
+- **是否经过人工审批**：封面图片复制与已有数据 `cover_image_url` 回填属文件/数据变更，重跑导入由用户自行开启 `app.system-dish.import.enabled=true` 后启动执行（用户显式操作）。
+- **实际测试命令与测试结果**：`mvn clean test -Dtest=HowToCookMarkdownParserTest` → 全量编译 120 main + 4 test 源文件，`Tests run: 10, Failures: 0, Errors: 0`，BUILD SUCCESS。
+- **最终是否接受 AI 结果**：代码与单测已验证；真实回填（复制图片 + 更新 `cover_image_url`）待用户开启导入开关重启后端执行后核验。
+- **经验总结**：
+  - 封面图选择要优先「成品/预览」alt、否则取第一张整行图片，避免把步骤图误作封面（如凉拌木耳）。
+  - 图片服务复用项目现有 `/uploads` 静态映射最省事且前端零改动；文件名按菜谱 id 确定保证重跑幂等。
+  - Maven 增量编译可能误报「Nothing to compile」，关键改动后用 `clean` 全量编译确认。

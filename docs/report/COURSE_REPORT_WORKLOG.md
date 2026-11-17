@@ -14,14 +14,14 @@
 | 基础仓库 | `manishxydev/food-delivery-backend`（外卖点餐后端） |
 | 项目形态 | 纯后端 REST API（原项目无前端） |
 | 二次开发方向 | 家庭内部使用的私厨点单与饮食协作系统 |
-| 当前阶段 | 后端 M-01~M-09 全部业务模块（含邀请码加入、用户资料与饮食偏好/忌口 + 下单自动备注、成员移除/角色修改、采购清单完整能力、菜品物理删除）及 H2→MySQL 9.6.0 迁移（Flyway V1~V5，忌口 V7 待迁移）已完成；新增接口 HTTP 实测 39/39 通过；前端阶段 0~7、3 个对齐入口（成员移除/改角色、采购清单编辑、菜品删除）及忌口/下单自动备注均已实现，`npm run build` 通过；阶段 8/9（整体联调、测试部署演示）与视觉细节待人工验收 |
+| 当前阶段 | 后端 M-01~M-10 全部业务模块（含邀请码加入、用户资料与饮食偏好/忌口 + 下单自动备注、成员移除/角色修改、采购清单完整能力、菜品物理删除、AI 助手菜谱结构化 L1 + 购物车整餐分析 L2）及 H2→MySQL 9.6.0 迁移（Flyway V1~V5，忌口 V7 待迁移）已完成；新增接口 HTTP 实测 39/39 通过；前端阶段 0~7、3 个对齐入口（成员移除/改角色、采购清单编辑、菜品删除）、忌口/下单自动备注及 AI 助手两个入口均已实现，`npm run build` 通过；阶段 8/9（整体联调、测试部署演示）与 AI 端到端 HTTP 实测、视觉细节待人工验收 |
 | 分析文档 | `docs/project-analysis/PROJECT_ANALYSIS.md`（已生成） |
 
 ## 2. 选题背景与目标
 
 - **背景**：课程设计需要同时体现传统软件工程开发流程与 AI 大模型工程化实践；选择一个已有开源后端项目作为改造基础，可降低"从零搭建"成本，聚焦业务建模与二次开发。
 - **目标**：将面向"外卖平台"的通用点餐后端，改造为面向"家庭内部"的私厨点单与饮食协作系统，覆盖家庭成员、菜品、购物车、下单、厨房备菜/开饭、采购清单、评论、饮食偏好等场景，并保留可选的 AI 菜谱能力。
-- **当前状态**：目标已明确（见第 5、6 节），但具体功能尚未实现。
+- **当前状态**：目标已明确，核心业务功能（家庭成员、菜品、购物车、下单、厨房备菜/开饭、采购清单、用户资料/忌口）与 AI 助手（菜谱结构化 L1、购物车整餐分析 L2）已实现；订单评论仍为后续扩展（见第 5 节）。
 
 ## 3. 开发环境与技术栈
 
@@ -38,7 +38,8 @@
 | 安全 | Spring Security + JWT（jjwt 0.12.5） | `pom.xml:38-68` |
 | 数据库 | MySQL 9.6.0，库名 `homechef_platform`；Flyway 10.10.0 管理 schema，Hibernate `validate` | `pom.xml`、`application.properties`、`db/migration/V1__create_homechef_schema.sql` |
 | 工具库 | Lombok 1.18.32 | `pom.xml:48` |
-| 外部 API | Google Gemini（AI 聊天） | `application.properties:18` |
+| 外部 API | Google Gemini（AI 聊天，原项目遗留） | `application.properties:18` |
+| 本地 AI | Ollama `qwen2.5:7b`（后端 `RestClient` 代理，`app.ai.*` 配置） | `application.properties`、`service/ai/OllamaClient.java` |
 | 测试框架 | spring-boot-starter-test；当前有邮箱规范化和购物清单金额精度单元测试 | `pom.xml`、`src/test/` |
 
 ### 3.1 MySQL 迁移实施事实
@@ -101,11 +102,14 @@
   - 个人独立购物车（M-05）：见 `docs/backend/CART_MODULE.md`。
   - 家庭下单与订单明细（M-06）、备菜协作与开饭（M-07）、最小采购清单（M-08）：见 `docs/backend/ORDER_MODULE.md`。
   - 用户资料与饮食偏好（M-09）：昵称/头像 URL/饮食偏好（白名单标签），并扩展「忌口」白名单标签（独立字段 `dietary_restrictions`，Flyway V7）与下单自动备注（前端预填），见 `docs/backend/API_FRONTEND_CONTRACT.md` 第 2.3 节。
+  - AI 助手（M-10）：L1 菜谱结构化（`POST /api/ai/parse-recipe`，新建菜品页「AI 智能识别」回填草稿）+ L2 购物车整餐分析（`POST /api/ai/analyze-cart`，购物车页「AI 整餐分析」，健康档案默认不注入、勾选后注入）；本地 Ollama `qwen2.5:7b` 经后端 `RestClient` 代理（零 Maven 依赖），见 `docs/backend/AI_MODULE_DESIGN.md`。
+  - 系统菜谱库 / 美食广场（M-11）：`SystemDish` 表族（Flyway V12 建 4 表、V13 种子 10 分类）+ HowToCook 373 道纯规则批量导入（`HowToCookMarkdownParser` + `SystemDishImportService` + `SystemDishImportRunner`，含封面图解析并复制到本地 `uploads`、`amount_text` 原文保留、无法量化用量降级）+ 分类/列表/详情/复制到我家接口（`SystemDishController`，`copy-to-family` 需 `price` 与可选 `ingredientOverrides`）；`dish_ingredients.amount_text` 由 Flyway V14 新增，详见 `docs/food-square/` 与 `AI_INTERACTION_LOG.md` 任务 026/027/029。
 - **前端历史记录**：2026-11-13 的过程记录记载阶段 0（工程初始化）、阶段 1（基础框架）和阶段 2（认证与家庭上下文）曾完成；本次检出时对应源码不在工作区，不能把历史记录当作当前代码状态：
   - 阶段 0：技术栈定稿 Vue3 + Vite + Vant + Axios；创建 `frontend/` 工程并安装依赖（`vue`/`axios`/`vite`/`@vitejs/plugin-vue`）；配置 `/api` 代理（`vite.config.js`，转发到 `localhost:8080`）；实测代理链路「前端→代理→后端」贯通（受保护接口返回 401）。
   - 阶段 1：引入 `vue-router@4` 并建立嵌套路由（`/` → `MainLayout` 父布局 + 五个子路由 `dishes/orders/cart/shopping/family` + 404）；落地设计令牌（`src/styles/tokens.css`：奶油白 `#FAF6EF`、浅绿主色 `#6B9E7C`、暖黄点缀 `#E8B04B`）与全局样式（`base.css`）；设计公共布局 `MainLayout.vue`（电脑端顶部导航 + 手机端底部五栏 TabBar，由单一数据源 `navItems` 驱动）；内置 SVG 图标组件 `NavIcon.vue` 与统一占位组件 `PagePlaceholder.vue`；创建五个空白占位页。实测：`npm run build` 成功、dev server 五个子路由与未知路由全部 200（history fallback 正常）、无头截图像素抽样确认移动端底栏/桌面端顶栏/背景色正确。业务页面（菜品/购物车/订单等）尚未编码，按 `FRONTEND_DEVELOPMENT_ROADMAP.md` 阶段 3 起逐模块开展。前后端交接文档见 `docs/backend/API_FRONTEND_CONTRACT.md`，前端设计见 `docs/frontend/FRONTEND_DESIGN.md`。
   - 阶段 2：引入 `pinia` 状态管理（`store/auth.js` 管 token/用户、`store/family.js` 管家庭列表与当前家庭，均持久化 localStorage）；`api/request.js` axios 实例 + 请求拦截器（自动附 `Authorization` 与 `X-Family-Id`）+ 响应拦截器（非登录接口 401 统一清空登录态并跳 `/login`）；`LoginView.vue` 登录/注册切换（字段级 + 通用错误）；`FamilySelect.vue` 家庭列表/切换/创建；`FamilyView.vue` 由占位页改为家庭选择 + 创建 + 退出；路由新增 `/login` 独立路由（脱离 MainLayout）与前置守卫（未登录 → `/login`，已登录访问 `/login` → `/dishes`）；`MainLayout.vue` 桌面顶导航加用户区 + 退出。实测：`npm run build` 成功、后端真实 HTTP 联调通过（注册 201 / 重复邮箱 409 / 错误密码 401 / 登录 200 / 创建家庭 201 / 带 `X-Family-Id` 访问 200 / 缺失 400）、未登录访问 `/dishes` 被重定向到 `/login`（无头截图哈希一致）。
 - **当前工作区前端状态（2026-11-15）**：阶段 0~7（认证、家庭选择、菜品库、购物车、订单备菜、采购清单、家庭展示 + 邀请码加入）均已实现，并补齐 3 个对齐入口（成员移除/改角色、采购清单编辑、菜品删除）及忌口/下单自动备注（个人资料忌口 chip + 购物车备注预填），前后端能力已对齐，`npm run build` 通过；整体联调与视觉细节待人工验收（本机缺少 Playwright Chromium）。详细阶段推进见 `FRONTEND_DEVELOPMENT_ROADMAP.md` 与 `BACKEND_PROGRESS.md` 第 6 节。
+- **美食广场前端（2026-11-17，阶段 10）**：新增底部第 6 个 Tab「广场」，实现系统菜谱列表（分类筛选 + 搜索 + 卡片网格）、菜谱详情（封面图/描述/食材含可选标记与 amountText/步骤/来源）与「复制到我家」（价格必填 + 缺失结构化用量食材的数量/单位补充，成功后跳转家庭菜品详情）；新增 `api/systemDish.js`、`SystemDishListView.vue`、`SystemDishDetailView.vue`、`SystemDishCard.vue`、`styles/systemDish.css`；修复 `van-image` 无封面图时缺 `#loading` 插槽导致显示默认灰色占位图标的问题（广场与家庭详情页统一为无图显示菜名、加载失败回退菜名）；`npm run build` 通过（407 模块）。
 - 原项目已实现模块（仅供复用参考，非本次新实现）：
   - 用户认证（`AuthService`、`AuthController`）
   - 餐厅管理（`RestaurantServiceImpl`，写接口已冻结）
@@ -140,13 +144,13 @@
 
 ## 11. AI 工程化实践摘要
 
-- 已记录 23 项 AI 辅助任务；任务 019 记录 M-09 用户资料与饮食偏好、成员移除/角色修改、采购清单完整能力、菜品物理删除的实现；任务 020 记录 Flyway V4/V5 迁移核验、新增接口 HTTP 实测（39/39）与测试数据清理；任务 021 记录前端补齐 3 个对齐入口（成员移除/改角色、采购清单编辑、菜品删除）；任务 022 记录前端阶段 8 整体联调与响应式适配；任务 023 记录忌口 + 下单自动备注（含 Flyway V7），详见 `AI_INTERACTION_LOG.md`。
+- 已记录 29 项 AI 辅助任务；任务 019 记录 M-09 用户资料与饮食偏好、成员移除/角色修改、采购清单完整能力、菜品物理删除的实现；任务 020 记录 Flyway V4/V5 迁移核验、新增接口 HTTP 实测（39/39）与测试数据清理；任务 021 记录前端补齐 3 个对齐入口（成员移除/改角色、采购清单编辑、菜品删除）；任务 022 记录前端阶段 8 整体联调与响应式适配；任务 023 记录忌口 + 下单自动备注（含 Flyway V7）；任务 024 记录 AI 助手 L1 菜谱结构化；任务 025 记录 AI 助手 L2 购物车整餐分析；任务 026 记录 HowToCook 系统菜谱全量批量导入（阶段 D）；任务 027 记录 HowToCook 解析器修复（计算章节只解析列表项）与全量删除重导；任务 028 记录美食广场前端（广场 Tab、列表/详情/复制到我家）；任务 029 记录 HowToCook 封面图解析与导入（复制到本地 uploads + 幂等回填），详见 `AI_INTERACTION_LOG.md`。
 - 后续开发过程中的 AI 使用情况将按模板逐条追加。
 
 ## 12. 项目成果与不足
 
-- **当前成果**：原项目分析与基线记录、需求规格、家庭业务后端（M-01~M-09 全部业务模块，含邀请码加入、用户资料与饮食偏好/忌口、成员移除/角色修改、采购清单完整能力、菜品物理删除）及 MySQL 9.6.0 首轮迁移已完成；新增接口 HTTP 实测 39/39 通过；前端阶段 0~7、3 个对齐入口（成员移除/改角色、采购清单编辑、菜品删除）及忌口/下单自动备注均已实现，前后端能力已对齐，`npm run build` 通过。
-- **当前不足**：前端阶段 8（整体联调/响应式）与阶段 9（最终测试/部署/演示准备）及人工浏览器验收待进行；MySQL 并发、约束负向及备份恢复测试待补；订单管理员取消权限与需求有差异；Flyway 对 MySQL 9.6.0 的验证范围警告待评估。
+- **当前成果**：原项目分析与基线记录、需求规格、家庭业务后端（M-01~M-11 全部业务模块，含邀请码加入、用户资料与饮食偏好/忌口、成员移除/角色修改、采购清单完整能力、菜品物理删除、AI 助手 L1/L2、系统菜谱库/美食广场含 HowToCook 373 道导入与封面图解析）及 MySQL 9.6.0 首轮迁移已完成；新增接口 HTTP 实测 39/39 通过；前端阶段 0~7、3 个对齐入口（成员移除/改角色、采购清单编辑、菜品删除）、忌口/下单自动备注、AI 助手两个入口及美食广场（列表/详情/复制到我家）均已实现，`npm run build` 通过。
+- **当前不足**：前端阶段 8（整体联调/响应式）与阶段 9（最终测试/部署/演示准备）及人工浏览器验收待进行；AI 助手端到端 HTTP 实测（需启动后端 + Ollama）待执行；MySQL 并发、约束负向及备份恢复测试待补；订单管理员取消权限与需求有差异；Flyway 对 MySQL 9.6.0 的验证范围警告待评估。
 
 ## 13. 后续优化方向
 
@@ -154,6 +158,8 @@
 - 完成 MySQL 9.6.0 的备份与恢复演练，并评估 Flyway 10.10.0 版本范围警告。
 - 补齐乐观锁冲突、家庭隔离、数据库约束拒绝及事务失败自动化测试。
 - 按业务决策完善订单状态与取消权限行为。
+- 启动后端 + 本地 Ollama 完成 AI 助手（菜谱结构化、整餐分析）端到端 HTTP 实测，并评估 7b 模型输出稳定性与换更大模型的收益。
+- 开启导入开关重启后端完成系统菜谱封面图回填；评估「难度 difficulty 语义修正（countStars 只数 ★）」与「家庭菜品编辑页 amountText 回填/覆盖」两个遗留项。
 
 ## 14. 最终演示和发布信息
 
@@ -177,3 +183,5 @@
 > 维护记录：2026-11-15 更新第 1/9/11/12 节：核验 Flyway V4/V5 已在正式库应用（`flyway_schema_history` 5 条、`users` 含 `avatar_url`/`dietary_preferences`），对全部新增接口完成 HTTP 实测（39/39 通过，脚本 `docs/testing/new-api-http-verify.ps1`），并清理写入正式库的测试数据（仅命中测试邮箱域名，历史数据未受影响）。
 > 维护记录：2026-11-15 更新第 1/8/11/12 节：前端补齐 3 个对齐入口（家庭成员移除/改角色、采购清单编辑、菜品删除），前后端能力对齐，`npm run build` 通过；至此「核心业务功能」代码已前后端闭环，阶段 8/9（整体联调、测试部署演示）与人工浏览器验收待进行。
 > 维护记录：2026-11-15 更新第 1/8/11/12 节：扩展「忌口 + 下单自动备注」——`users` 新增 `dietary_restrictions`（Flyway V7）、`DietaryRestriction` 白名单枚举 6 值（不吃辣/香菜/海鲜/牛羊肉/猪肉/葱姜蒜），`GET/PUT /api/users/me` 请求/响应新增 `dietaryRestrictions`；前端个人资料页加「忌口」chip 组、购物车下单读 profile 预填备注「忌口：xxx」（可见可编辑）。后端 `mvn -o compile -DskipTests` 与前端 `npm run build` 均通过；Flyway V7 迁移与 HTTP 实测待重启后端验证。
+> 维护记录：2026-11-16 更新第 1/2/3/8/11/12/13 节：实现 AI 助手模块（M-10）——L1 菜谱结构化（`POST /api/ai/parse-recipe`，新建菜品页「AI 智能识别」回填草稿）+ L2 购物车整餐分析（`POST /api/ai/analyze-cart`，购物车页「AI 整餐分析」，健康档案默认不注入、勾选后注入）；本地 Ollama `qwen2.5:7b` 经后端 `RestClient` 代理（零 Maven 依赖），`GlobalExceptionHandler` 加 `AiServiceException` → 502，`application.properties` 加 `app.ai.*` 配置；后端 `mvn -o compile` 与前端 `npm run build`（403 modules）均通过，L1 前端人工验证通过，AI 端到端 HTTP 实测待启动后端 + Ollama 后执行。
+> 维护记录：2026-11-17 更新第 11 节：修复 HowToCook 解析器（「计算」章节只解析列表项、`+` 纳入列表前缀、表格食材本次降级为空），全量删除 373 条旧 HOWTOCOOK 数据后重导（新增 373、跳过 0、失败 0）；数据库验证说明文字/`+` 前缀/`|` 表格三类脏数据全部清零、食材总数 2835，HTTP API 验证 `dishTotal=373`、`categoryCount=10`、搜索命中 7、鸡蛋花食材 4 条（修复前 5 条含 1 条脏数据）。

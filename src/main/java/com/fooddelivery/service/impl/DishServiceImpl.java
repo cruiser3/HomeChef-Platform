@@ -290,14 +290,17 @@ public class DishServiceImpl implements DishService {
                 if (ingredient == null || ingredient.getName() == null || ingredient.getName().isBlank()) {
                     throw new BadRequestException("Ingredient name is required");
                 }
-                if (ingredient.getAmount() == null) {
-                    throw new BadRequestException("Ingredient amount is required");
+                boolean hasAmount = ingredient.getAmount() != null;
+                boolean hasUnit = ingredient.getUnit() != null && !ingredient.getUnit().isBlank();
+                boolean hasAmountText = ingredient.getAmountText() != null && !ingredient.getAmountText().isBlank();
+                if (hasAmount != hasUnit) {
+                    throw new BadRequestException("Ingredient amount and unit must be provided together");
                 }
-                if (ingredient.getAmount().compareTo(BigDecimal.ZERO) < 0) {
+                if (!hasAmount && !hasAmountText) {
+                    throw new BadRequestException("Ingredient must have either amount and unit, or amount text");
+                }
+                if (hasAmount && ingredient.getAmount().compareTo(BigDecimal.ZERO) < 0) {
                     throw new BadRequestException("Ingredient amount must be zero or positive");
-                }
-                if (ingredient.getUnit() == null || ingredient.getUnit().isBlank()) {
-                    throw new BadRequestException("Ingredient unit is required");
                 }
             }
         }
@@ -360,7 +363,8 @@ public class DishServiceImpl implements DishService {
                     .dishId(dishId)
                     .name(item.getName().trim())
                     .amount(item.getAmount())
-                    .unit(item.getUnit().trim())
+                    .unit(item.getUnit() == null ? null : item.getUnit().trim())
+                    .amountText(item.getAmountText() == null ? null : item.getAmountText().trim())
                     .sortNo(i)
                     .build());
         }
@@ -397,6 +401,7 @@ public class DishServiceImpl implements DishService {
                                 .name(item.getName())
                                 .amount(item.getAmount())
                                 .unit(item.getUnit())
+                                .amountText(item.getAmountText())
                                 .build())
                         .toList())
                 .steps(dishStepRepository.findByDishIdOrderByStepNoAsc(dish.getId()).stream()

@@ -43,14 +43,15 @@ public class DishRequest {
         @Size(max = 100, message = "Ingredient name must not exceed 100 characters")
         private String name;
 
-        @NotNull(message = "Ingredient amount is required")
         @DecimalMin(value = "0.00", message = "Ingredient amount must be zero or positive")
         @Digits(integer = 8, fraction = 2, message = "Ingredient amount must have at most 2 decimals")
         private BigDecimal amount;
 
-        @NotBlank(message = "Ingredient unit is required")
         @Size(max = 20, message = "Ingredient unit must not exceed 20 characters")
         private String unit;
+
+        @Size(max = 100, message = "Ingredient amount text must not exceed 100 characters")
+        private String amountText;
     }
 
     @Data

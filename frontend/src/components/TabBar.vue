@@ -46,6 +46,12 @@ defineProps({
           <path d="M9 5h11M9 12h11M9 19h11" />
           <path d="m3 5 1 1 2-2m-3 8 1 1 2-2m-3 8 1 1 2-2" />
         </template>
+        <template v-else-if="item.icon === 'plaza'">
+          <path d="M4 11v8a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 19v-8" />
+          <path d="M3.5 11 5 6a1.5 1.5 0 0 1 1.4-1h11.2A1.5 1.5 0 0 1 19 6l1.5 5" />
+          <path d="M3.5 11h17" />
+          <path d="M9.5 11v3.5h5V11" />
+        </template>
         <template v-else>
           <circle cx="9" cy="8" r="3" />
           <path d="M3.5 20v-1.5a5.5 5.5 0 0 1 11 0V20zM16 5.5a3 3 0 0 1 0 5.8m2 3a4.5 4.5 0 0 1 2.5 4.1V20h-3" />

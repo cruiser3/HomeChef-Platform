@@ -41,6 +41,7 @@ public class DishResponse {
         private String name;
         private BigDecimal amount;
         private String unit;
+        private String amountText;
     }
 
     @Data

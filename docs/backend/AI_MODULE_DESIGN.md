@@ -1,6 +1,6 @@
 # AI 助手后端对接设计（AI_MODULE_DESIGN）
 
-**状态：设计稿，未实现。** 本文档只做技术设计，未修改任何业务代码；经用户确认后才进入编码。
+**状态：已实现（L1 + L2）。** 本文档已从设计稿演进为实现记录；L1 菜谱结构化与 L2 购物车整餐分析均已编码完成，后端编译与前端构建通过，前端入口已接入。L3 不做。
 
 **依据：** 当前源码（`Dish` / `DishIngredient` / `DishStep` / `CartItem` / `CartServiceImpl` / `DishEditView.vue`）、`application.properties`、`pom.xml`（Spring Boot 3.3.2，已含 `spring-boot-starter-web`），以及本机 Ollama `qwen2.5:7b` 已验证的结构化输出效果。
 
@@ -8,10 +8,10 @@
 
 ## 1. 设计范围与目标
 
-| 等级 | 能力 | 本设计是否覆盖 |
+| 等级 | 能力 | 状态 |
 |---|---|---|
-| L1 | 粘贴菜谱文本 → 结构化（菜名 / 食材 / 步骤） | **本期完整设计** |
-| L2 | 购物车整餐分析（卡路里 / 营养 / 搭配建议） | 概要设计（后续细化） |
+| L1 | 粘贴菜谱文本 → 结构化（菜名 / 食材 / 步骤） | **已实现**（`POST /api/ai/parse-recipe`） |
+| L2 | 购物车整餐分析（卡路里 / 营养 / 搭配建议） | **已实现**（`POST /api/ai/analyze-cart`） |
 | L3 | 自然语言点单 / 多轮对话助手 | **不做**（性价比最低，且需 function calling + 会话管理） |
 
 核心定位：**AI 是「增值辅助」，不是点单主流程的必经环节**。AI 关闭时，新建菜品 / 购物车 / 点单照常工作。
@@ -142,39 +142,51 @@ AiRecipeService.parseRecipe(text)
 
 ---
 
-## 5. L2 购物车整餐分析（概要设计，后续细化）
+## 5. L2 购物车整餐分析（已实现）
 
 ### 5.1 API 设计
 
-`POST /api/ai/analyze-cart`（需 JWT + `X-Family-Id`），请求体可空（后端自行取当前用户当前家庭购物车）。
+`POST /api/ai/analyze-cart`（需 JWT + `X-Family-Id`），请求体可空（后端自行取当前用户当前家庭购物车，默认不注入健康档案）。
 
-响应：营养/热量/搭配建议文本或结构化 JSON（具体 schema 待细化）。
+请求（可空）：
 
-### 5.2 后端数据获取链路
-
-```
-CartServiceImpl 逻辑复用：
-  1. currentUserService.requireMembership(familyId)
-  2. 查 cart_items（userId + familyId）→ dishId 列表
-  3. 查 dishes → 查 dish_ingredients（按 dishId）
-  4. 拼成文本：「用户购物车有：番茄炒蛋(食材:番茄2个、鸡蛋2个…)、…」
+```json
+{ "includeHealthProfile": true }
 ```
 
-> 注意：`CartResponse` 现不含食材，L2 需新增「购物车菜品 + 食材」的聚合查询（可复用 `DishIngredientRepository`，按 `dishId IN (...)` 查）。
+响应（成功）：
+
+```json
+{
+  "summary": "整体评价文本",
+  "nutrition": "营养概况文本",
+  "suggestions": ["建议1", "建议2"],
+  "cautions": ["注意事项1"]
+}
+```
+
+> `includeHealthProfile` 默认 `false`；为 `true` 时后端才把当前用户健康档案（忌口/过敏/疾病标签）注入提示词（见 5.3）。缺失 `X-Family-Id` 返回 400。
+
+### 5.2 后端数据获取链路（`AiCartAnalyzeService.analyzeCart`）
+
+1. `currentUserService.requireMembership(familyId)`——家庭数据隔离校验，不信任前端传入 `familyId`。
+2. `cartItemRepository.findByUserIdAndFamilyIdOrderByCreatedAtAsc(userId, familyId)`——按「用户 + 家庭」取购物车。
+3. `dishRepository.findAllById(dishIds)` 一次 IN 查全菜品，`Collectors.toMap(Dish::getId, ...)` 转 Map 做 O(1) 查找，避免双重循环。
+4. 对每个菜品循环 `dishIngredientRepository.findByDishIdOrderBySortNoAsc(dishId)` 取食材（购物车菜品少，N+1 可接受，避免新增 Repository 查询方法）。
+5. 拼成文本「用户购物车有：番茄炒蛋(食材:番茄2个、鸡蛋2个、盐少许)、…」；`amount` 用 `stripTrailingZeros().toPlainString()` 去尾零，`amount=0` 时只取 `unit`。
+6. （可选）读用户 profile，拼健康档案前导提示词（见 5.3）。
+7. 调 `OllamaClient.chat`，`ObjectMapper` 解析，失败重试 2 次，仍失败抛 `AiServiceException`（→ 502）。
 
 ### 5.3 健康档案前导提示词（合规关键）
 
-后端在调用 AI 前读当前用户 profile（`dietaryPreferences` / `dietaryRestrictions` / `allergies` / `medicalConditions`），拼成前导提示词：
-
-```text
-用户情况：健康情况(糖尿病)，忌口(不吃辣)，过敏(海鲜)。请据此给出建议。
-```
+后端在调用 AI 前读当前用户 profile（`dietaryPreferences` / `dietaryRestrictions` / `allergies` / `medicalConditions`，均为逗号分隔字符串，可能含英文枚举如 `DIABETES`/`NO_SPICY`），拼成前导提示词，并注明「标签可能为英文枚举，请按语义理解」。
 
 合规约束（`AGENTS.md 6.7`）：
 
 - 本地 Ollama 不算「发送给第三方 AI 服务」，但仍须遵守「AI 饮食建议不得冒充医疗诊断」。
-- 前端须提供**明确的授权开关 + 免责声明**（「建议仅供饮食参考，不构成医疗建议」），用户开启后才把健康信息注入提示词；关闭则只做不带个人健康信息的通用分析。
-- 本期 L1（菜谱结构化）**不涉及**健康信息；L2 才需要上述授权。
+- `includeHealthProfile` 默认 `false`——**用户不勾选就不注入任何健康信息**；前端面板提供「结合我的健康档案」勾选项，勾选后触发带健康档案的重新分析。
+- 前端面板常驻「建议仅供饮食参考，不构成医疗建议」免责声明。
+- 提示词强制「用约/估算等措辞，禁止输出精确医疗数据或医疗诊断结论」。
 
 ---
 
@@ -192,21 +204,31 @@ app.ai.ollama.timeout-ms=120000
 
 ---
 
-## 7. 涉及文件清单（全部新增，不改 pom.xml）
+## 7. 实际涉及文件清单（已实现）
+
+后端（6 新增 + 2 修改，不改 `pom.xml`）：
 
 | 层 | 文件 | 说明 |
 |---|---|---|
-| Config | `config/AiProperties.java`（或直接用 `@Value`） | 读取第 6 节配置 |
-| Client | `service/ai/OllamaClient.java` | RestClient 封装，唯一 HTTP 出口 |
-| Service | `service/AiRecipeService.java` | 拼提示词 + 解析 + 校验 + 重试 + 降级 |
-| Controller | `controller/AiController.java` | `POST /api/ai/parse-recipe`（+ 后续 `analyze-cart`） |
-| DTO | `dto/AiRecipeParseRequest.java`、`dto/AiRecipeParseResponse.java` | 请求/响应 |
-| Exception | 复用/新增 `AiServiceException` | AI 调用失败专用异常 |
-| 前端 | `frontend/src/api/ai.js` | api 封装 |
-| 前端 | `DishEditView.vue` 增加「AI 智能识别」入口 | 与现有「粘贴分步」并列 |
-| 配置 | `application.properties` 追加第 6 节 | 需审批 |
+| Client | `service/ai/OllamaClient.java`（新增） | RestClient 封装，唯一 HTTP 出口 |
+| Service | `service/AiRecipeService.java`（新增） | L1：拼提示词 + 解析 + 校验 + 重试 + 降级 |
+| Service | `service/AiCartAnalyzeService.java`（新增） | L2：聚合购物车/食材 + 健康档案注入 + 解析 |
+| Controller | `controller/AiController.java`（新增） | `POST /api/ai/parse-recipe` + `POST /api/ai/analyze-cart` |
+| DTO | `dto/AiRecipeParseRequest/Response.java`、`dto/AiCartAnalyzeRequest/Response.java`（新增） | L1/L2 请求与响应 |
+| Exception | `exception/AiServiceException.java`（新增） | AI 调用失败专用异常 |
+| 修改 | `exception/GlobalExceptionHandler.java` | 加 `AiServiceException` → 502 |
+| 修改 | `application.properties` | 追加第 6 节 4 行 AI 配置 |
 
-> 不改 `pom.xml`、不改认证/授权、不改既有 Entity/DTO/迁移。
+前端（1 新增 + 3 修改）：
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| API | `frontend/src/api/ai.js`（新增） | `parseRecipe` + `analyzeCart`，均覆盖 120s 超时 |
+| 修改 | `DishEditView.vue` | L1 入口：加「AI 智能识别」按钮 + 弹出面板 + 回填 |
+| 修改 | `CartView.vue` | L2 入口：加「AI 整餐分析」按钮 + 弹出面板 + 健康档案勾选 |
+| 修改 | `styles/cart.css` | 加 `.cart-ai` / `.ai-analyze-*` 样式 |
+
+> 不改 `pom.xml`、不改认证/授权、不改既有 Entity/DTO/迁移；L2 复用 `DishIngredientRepository.findByDishIdOrderBySortNoAsc` 循环查询，未新增 Repository 方法。
 
 ---
 
@@ -244,19 +266,27 @@ app.ai.ollama.timeout-ms=120000
 
 ---
 
-## 11. 测试与验证计划（待实现后执行）
+## 11. 测试与验证结果（已执行）
 
-1. 后端 `mvn -o clean compile` 通过。
-2. Ollama 本机 `qwen2.5:7b` 在线时，`POST /api/ai/parse-recipe` 实测：正常文本返回正确 JSON；非法 JSON 触发重试/降级。
-3. Ollama 停止时，接口返回「AI 不可用」且不抛 500。
-4. `app.ai.enabled=false` 时接口直接拒绝。
-5. 前端构建通过；`DishEditView` 回填后走正常创建流程，`stepNo` 顺序正确。
+| 验证项 | 结果 |
+|---|---|
+| 后端编译 | `mvn -o -q clean compile -DskipTests` → BUILD SUCCESS（exitCode 0） |
+| 前端构建 | `npm --prefix frontend run build` → 成功（L1 403 modules；L2 403 modules，CartView 7.12 kB） |
+| lint | 后端 5 文件 + 前端 3 文件 → 0 diagnostics |
+| Ollama 结构化（阶段 0 预验证） | 本机 `qwen2.5:7b` 对菜谱结构化一次通过，输出 JSON 完全符合 schema（含「盐少许 → amount=0 + unit=少许」） |
+| 前端人工验证 | L1 已在浏览器验证通过（用户确认）；L2 用户确认实现完成 |
+
+待执行（需启动后端 + Ollama 的端到端 HTTP 实测）：
+
+1. `POST /api/ai/parse-recipe` 端到端实测（Ollama 在线正常文本 / 非法 JSON 触发重试 / Ollama 停止返回「AI 不可用」不抛 500）。
+2. `POST /api/ai/analyze-cart` 端到端实测（购物车聚合 + 健康档案注入）。
+3. `app.ai.enabled=false` 时接口直接拒绝。
 
 ---
 
-## 12. 待用户拍板的决策点
+## 12. 决策点回顾（已拍板）
 
-1. **Ollama 接口风格**：原生 `/api/chat`（建议）还是 OpenAI 兼容 `/v1/chat/completions`（未来易换云）？
-2. **AI 是否直接建菜**：本设计采用「AI 只返回草稿、回填表单、用户确认后走既有创建」（建议）。是否认可？
-3. **本期范围**：先只做 L1，还是 L1 + L2 一起设计细化？
-4. **是否落档**：本设计文档是否保留在 `docs/backend/`，并纳入 `docs/README.md` 索引？
+1. **Ollama 接口风格**：采用原生 `/api/chat` + `format:"json"`（已实现；`OllamaClient` 隔离接口差异，未来换云只需替换实现）。
+2. **AI 是否直接建菜**：AI 只返回草稿、回填表单、用户确认后走既有 `POST /api/dishes` 创建（已按此实现）。
+3. **本期范围**：L1 + L2 均已实现；L3 不做。
+4. **是否落档**：本设计文档保留在 `docs/backend/`，并已纳入 `docs/README.md` 索引。

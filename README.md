@@ -2,80 +2,119 @@
 
 面向家庭、情侣和合租室友等熟人小群体的点单与饮食协作系统。成员可以共同维护家庭菜品、使用个人购物车下单，并协作备菜、记录实际缺少的食材。
 
-本项目由原 Spring Boot 外卖后端改造而来；当前实现面向家庭场景，不是面向公众的外卖平台，不提供餐厅配送、支付或平台抽佣等功能。原外卖遗留的餐厅、旧菜单、旧订单和 Gemini 聊天模块已删除。
+本项目由原 Spring Boot 外卖后端改造而来；面向家庭场景，不提供餐厅配送、支付或平台抽佣等功能，原外卖遗留的餐厅、旧菜单、旧订单和 Gemini 聊天模块已删除。
 
-## 当前进度
+## 功能概览
 
-**截至 2026-11-15：**
-
-- 后端已实现注册/登录与 JWT、家庭创建和成员信息查询、家庭菜品及分类/食材/步骤、按用户和家庭隔离的购物车、家庭订单和备菜协作、家庭待采购清单。
-- 数据库已从 H2 迁移到 MySQL 9.6.0（库 `homechef_platform`），由 Flyway V1 管理表结构，Hibernate `ddl-auto=validate` 校验。
-- 前端工程 `frontend/` 已建立（Vue 3 + Vite），阶段 0（工程初始化）已验收、阶段 1（路由/五导航/响应式布局/通用组件）已实现，后续阶段按路线图逐阶段推进，详见 `docs/frontend/FRONTEND_DEVELOPMENT_ROADMAP.md`。
-- 邀请码加入家庭、用户资料与饮食偏好等功能尚未实现。
-- `src/test/` 现有 2 个测试类、共 3 项单元测试（邮箱规范化、采购清单校验），`mvn -B clean test` 通过；业务接口另以 HTTP 冒烟测试覆盖。测试范围有限，详见 `docs/backend/BACKEND_PROGRESS.md` 第 4 节。
+- 认证与用户：注册、登录（JWT）、个人资料与饮食偏好（过敏原、医疗状况、饮食限制）。
+- 家庭协作：创建家庭、邀请码加入、成员与角色管理，家庭数据严格隔离。
+- 家庭菜品：菜品、分类、食材、制作步骤的增删改查与上下架，支持按菜系、卡路里区间、关键字筛选。
+- 美食广场：内置 HowToCook 开源菜谱数据源，浏览/搜索/筛选系统菜谱，一键复制到自家。
+- 点单与备菜：按「用户 + 家庭」隔离的个人购物车、家庭订单、逐菜品备菜状态与开饭管理。
+- 采购清单：记录备菜时实际缺少的食材并标记已购。
+- 菜品评论：家庭菜品评价与回复。
+- AI 辅助（可选）：菜谱文本解析、购物车分析、卡路里估算、菜系自动分类，基于本地 Ollama。
 
 ## 技术栈
 
+### 后端
+
 - Java 17、Spring Boot 3.3.2、Maven
-- Spring Web、Spring Validation、Spring Security、JWT（jjwt 0.12.5）
-- Spring Data JPA / Hibernate
-- MySQL 9.6.0（Connector/J 9.7.0）+ Flyway、Lombok
-- 前端：Vue 3、Vite
+- Spring Web、Spring Data JPA、Spring Validation、Spring Security + JWT（jjwt 0.12.5）
+- MySQL（Connector/J 9.7.0）+ Flyway 数据库迁移
+- Lombok
+- AI：本地 Ollama（默认模型 `qwen2.5:7b`，可配置关闭）
+
+### 前端
+
+- Vue 3、Vite、Vant 4（移动端组件库）、Pinia、Vue Router、Axios
+- 响应式布局，兼顾手机「点单风」与桌面端
 
 ## 项目结构
 
 ```text
 .
 ├── src/main/java/com/fooddelivery/
-│   ├── controller/       # REST API 控制器（Auth/Cart/Dish/Family/FamilyOrder/Home/ShoppingList）
-│   ├── dto/              # API 请求与响应对象
-│   ├── entity/           # 用户、家庭、菜品、购物车、家庭订单、采购清单等实体
-│   ├── exception/        # 业务异常和统一错误响应
-│   ├── repository/       # Spring Data JPA 数据访问接口
-│   ├── security/         # Spring Security、JWT 认证
-│   └── service/          # 业务接口及实现
+│   ├── config/           # 安全、Web 等配置
+│   ├── controller/       # REST API 控制器
+│   ├── dto/              # 请求/响应对象
+│   ├── entity/           # JPA 实体
+│   ├── exception/        # 业务异常与统一错误响应
+│   ├── repository/       # Spring Data JPA 数据访问
+│   ├── security/         # Spring Security / JWT
+│   ├── service/          # 业务接口与实现
+│   │   └── importing/    # HowToCook 菜谱导入与解析
+│   └── util/             # 工具类
 ├── src/main/resources/
-│   ├── application.properties   # 后端及 MySQL 数据库配置
-│   └── db/migration/           # Flyway 数据库迁移脚本（V1 建表）
-├── src/test/java/        # 单元测试（邮箱规范化、采购清单校验）
-├── frontend/             # Vue 3 + Vite 前端工程（阶段 0/1 已实现）
-├── docs/
-│   ├── backend/          # 后端模块说明、进度与 API 契约
-│   ├── database/         # MySQL 数据库设计
-│   ├── frontend/         # 前端设计、开发路线图与实施指南
-│   ├── project-analysis/ # 项目分析与运行验证记录
-│   ├── requirements/     # 需求及需求分析资料
-│   ├── report/           # 课程报告和过程记录
-│   └── testing/          # 测试资料
-└── screenshots/          # 界面设计参考截图
+│   ├── application.properties
+│   └── db/migration/     # Flyway 迁移脚本（V1～V17）
+├── src/test/java/        # 单元测试
+├── frontend/             # Vue 3 + Vite 前端
+│   ├── src/api/          # 后端接口封装
+│   ├── src/views/        # 页面组件
+│   ├── src/router/       # 路由与鉴权守卫
+│   ├── src/layouts/      # 布局
+│   ├── src/store/        # Pinia 状态
+│   └── src/styles/       # 样式
+├── HowToCook/            # 美食广场菜谱数据源（Markdown + 图片 + LICENSE）
+├── Dockerfile            # 后端容器化（两阶段构建）
+├── pom.xml
+└── README.md
 ```
 
-## 已实现的后端接口范围
+## 已实现的后端接口
 
 | 模块 | 路径 | 主要能力 |
 |---|---|---|
 | 认证 | `/api/auth` | 注册、登录并获取 JWT |
-| 家庭 | `/api/families` | 创建家庭、查询家庭及成员信息 |
-| 菜品 | `/api/dishes` | 菜品、分类、食材、步骤的查询与创建/修改、上下架 |
-| 购物车 | `/api/cart` | 查询、添加、修改数量、删除项目、清空 |
-| 家庭订单 | `/api/family-orders` | 提交订单、查询、取消、开始备菜、开饭、更新菜品备菜状态及负责人 |
-| 采购清单 | `/api/shopping-list` | 查看清单、新增实际缺少的食材 |
+| 家庭 | `/api/families` | 创建/查询家庭、成员列表、邀请码获取与重置、邀请码加入、移除成员、角色分配 |
+| 菜品 | `/api/dishes` | 菜品与分类 CRUD、上下架、按菜系/卡路里/关键字筛选；菜品评论与回复 |
+| 菜系 | `/api/cuisines` | 菜系列表与新增 |
+| 购物车 | `/api/cart` | 查询、添加、修改数量、删除、清空 |
+| 家庭订单 | `/api/family-orders` | 提交、列表、详情、取消、开始备菜、开饭、逐菜品备菜状态 |
+| 采购清单 | `/api/shopping-list` | 记录缺少食材、更新、标记已购、删除 |
+| 系统菜谱 | `/api/system-dishes` | 分类、列表（分类/菜系/卡路里/关键字筛选）、详情、设置菜系、复制到家庭、AI 菜系分类 |
+| AI | `/api/ai` | 解析菜谱、分析购物车、估算卡路里 |
+| 上传 | `/api/upload` | 图片上传 |
+| 用户 | `/api/users` | 获取/更新个人资料与饮食偏好 |
 
-除注册和登录外，接口需要 JWT。家庭相关请求按接口契约携带当前家庭上下文（`X-Family-Id`）；具体请求和响应格式请参见 [API 契约](docs/backend/API_FRONTEND_CONTRACT.md)。
+除注册、登录和根路径外，接口需要 JWT；家庭相关请求需携带 `X-Family-Id` 请求头标识当前家庭上下文，后端会校验成员资格。
+
+## 美食广场（系统菜谱库）
+
+广场菜谱数据来自开源项目 HowToCook（已保留其 `LICENSE`），存放在仓库 `HowToCook/` 目录。后端启动时按 `application.properties` 中的配置幂等导入：
+
+```properties
+app.system-dish.import.enabled=true
+app.system-dish.import.howtocook-path=./HowToCook
+```
+
+首次启动会把 `HowToCook/dishes` 下的 Markdown 菜谱解析入库，封面图复制到 `uploads/`；重复启动跳过已存在项，不会重复导入。
+
+## AI 功能（可选）
+
+AI 能力通过本地 [Ollama](https://ollama.com) 提供，默认关闭不影响主体功能：
+
+```properties
+app.ai.enabled=true
+app.ai.ollama.base-url=http://localhost:11434
+app.ai.ollama.model=qwen2.5:7b
+```
+
+启用前需本地运行 Ollama 并拉取对应模型（如 `ollama pull qwen2.5:7b`）；若未运行 Ollama，请将 `app.ai.enabled` 设为 `false` 以避免 AI 接口报错。
 
 ## 本地运行
 
 ### 环境要求
 
-- JDK 17
-- Maven
-- 本地可访问的 MySQL 9.x 实例，并已创建数据库 `homechef_platform` 与应用账号
+- JDK 17、Maven
+- MySQL，已创建数据库 `homechef_platform` 与应用账号
+- Node.js（运行前端）
+- 可选：Ollama（启用 AI 功能）
 
 ### 启动后端（Windows PowerShell）
 
-在项目根目录打开 PowerShell。`JWT_SECRET` 和 `DB_PASSWORD` 是必需配置；以下命令会生成临时随机 JWT 密钥，并只对当前终端会话生效。
-
-当前 Windows 用户目录包含中文字符，而 `spring-boot:run` 启动的子进程未能从该路径加载 Maven 依赖。使用临时 ASCII 盘符映射运行；以下命令假设 `M:` 尚未被占用：
+`JWT_SECRET` 和 `DB_PASSWORD` 为必需环境变量。若当前 Windows 用户名含中文，`spring-boot:run` 子进程可能无法从用户目录加载 Maven 依赖，可用临时 ASCII 盘符映射规避（以下假设 `M:` 未被占用）：
 
 ```powershell
 subst M: "$env:USERPROFILE"
@@ -87,59 +126,59 @@ $env:DB_PASSWORD = "你的 MySQL 应用账号密码"
 mvn "-Dmaven.repo.local=M:\.m2\repository" spring-boot:run
 ```
 
-如果 `M:` 已被占用，请换成其他空闲盘符，并同步替换 Maven 命令中的盘符。等待终端出现 Spring Boot 启动完成信息后，保持此终端运行。默认后端地址为 `http://localhost:8080`；可通过 `PORT` 环境变量更改端口。
+如果 `M:` 已被占用，请换成其他空闲盘符，并同步替换 Maven 命令中的盘符。启动完成后默认后端地址为 `http://localhost:8080`，可通过 `PORT` 环境变量更改端口。停止服务后可用 `subst M: /D` 移除映射。
 
-停止服务时在运行后端的终端按 `Ctrl+C`。服务停止后，可以移除本次临时盘符映射：
+### 启动前端
 
 ```powershell
-subst M: /D
+cd frontend
+npm install
+npm run dev
 ```
 
-### 验证后端
+前端开发服务器默认监听 `0.0.0.0:5173`，并将 `/api`、`/uploads` 请求代理到后端 `http://127.0.0.1:8080`（可用 `API_PROXY_TARGET` 环境变量覆盖）。
 
-在另一个 PowerShell 终端运行：
+### 验证后端
 
 ```powershell
 Invoke-RestMethod -Uri http://localhost:8080/
 ```
 
-成功时会收到 HTTP 响应，JSON 中包含 `"status": "running"`。也可以检查端口：
-
-```powershell
-Test-NetConnection 127.0.0.1 -Port 8080
-```
-
-`TcpTestSucceeded` 为 `True` 表示该端口有程序接受连接；建议同时请求根路径，以确认响应来自本应用。
+成功时返回 JSON 含 `"status": "running"`。
 
 ## 构建与测试
 
-在项目根目录验证后端编译与单元测试：
+后端编译与单元测试：
 
 ```powershell
 mvn clean test
 ```
 
-当前 `src/test/` 有 2 个测试类、共 3 项单元测试；该命令成功表示主代码编译通过且这 3 项测试通过。业务接口的完整验证见 `docs/backend/BACKEND_PROGRESS.md` 第 4 节的 HTTP 冒烟测试记录。
+前端生产构建：
+
+```powershell
+cd frontend
+npm run build
+```
+
+`src/test/` 现有 4 个测试类（邮箱规范化、采购清单校验、系统菜谱服务、HowToCook 解析器）。
 
 ## 数据库与配置
 
-- 当前数据库：MySQL 9.6.0，连接地址 `jdbc:mysql://127.0.0.1:3306/homechef_platform`，由 Flyway V1 自动建表；Hibernate `ddl-auto=validate` 校验实体与表结构一致。
-- `JWT_SECRET`：必需的 JWT 签名密钥；本地可按启动步骤临时生成。不要把真实密钥提交到版本库。
+- 数据库：MySQL，Flyway 以 `src/main/resources/db/migration` 下 V1～V17 脚本管理表结构与演进，Hibernate `ddl-auto=validate` 校验。
+- `JWT_SECRET`：必需的 JWT 签名密钥；本地可按启动步骤临时生成，不要把真实密钥提交到版本库。
 - `DB_PASSWORD`：必需的 MySQL 应用账号密码。
 - `DB_URL`、`DB_USERNAME`：可选，默认分别为 `jdbc:mysql://127.0.0.1:3306/homechef_platform` 和 `homechef_app`。
 - `PORT`：后端端口，可选，默认 `8080`。
+- `API_PROXY_TARGET`：前端开发代理目标，可选，默认 `http://127.0.0.1:8080`。
 
-## 相关文档
+## Docker 部署
 
-`docs/` 中部分分析和过程文档是早期阶段快照，可能保留旧模型、旧测试结果或旧前端状态；与当前实现有冲突时，以源码和本 README 的当前进度说明为准。
+后端镜像两阶段构建：
 
-- [后端进度总览](docs/backend/BACKEND_PROGRESS.md)
-- [认证与家庭模块](docs/backend/AUTH_FAMILY.md)
-- [菜品模块](docs/backend/DISH_MODULE.md)
-- [购物车模块](docs/backend/CART_MODULE.md)
-- [订单模块](docs/backend/ORDER_MODULE.md)
-- [后端 API 契约](docs/backend/API_FRONTEND_CONTRACT.md)
-- [MySQL 数据库设计](docs/database/MYSQL_DATABASE_DESIGN.md)
-- [前端开发路线图](docs/frontend/FRONTEND_DEVELOPMENT_ROADMAP.md)
-- [前端开发实施指南](docs/frontend/FRONTEND_DEVELOPMENT_GUIDE.md)
-- [文档索引](docs/README.md)
+```bash
+docker build -t homechef-backend .
+docker run -e JWT_SECRET=... -e DB_PASSWORD=... -p 8080:8080 homechef-backend
+```
+
+> 镜像仅包含后端；如需美食广场菜谱，请将 `HowToCook/` 目录挂载进容器，或关闭 `app.system-dish.import.enabled`。

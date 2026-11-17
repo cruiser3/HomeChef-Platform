@@ -31,6 +31,10 @@
   display: none;
 }
 
+.plaza-categories + .plaza-categories {
+  margin-top: 8px;
+}
+
 .plaza-category-chip {
   display: inline-flex;
   flex: 0 0 auto;
@@ -50,6 +54,34 @@
   border-color: var(--primary-dark);
   background: var(--primary-dark);
   color: #fff;
+}
+
+.calorie-custom-panel {
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+}
+
+.calorie-custom-panel h3 {
+  margin: 0 0 16px;
+  font-size: 18px;
+}
+
+.calorie-custom-panel .van-field {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.calorie-custom-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.calorie-custom-actions .van-button {
+  flex: 1;
+  height: 48px;
+  border-radius: 13px;
+  font-weight: 600;
 }
 
 .plaza-loading {
@@ -136,6 +168,11 @@
   margin: 0;
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.system-dish-card-cuisine {
+  color: var(--accent);
+  font-weight: 650;
 }
 
 .system-dish-card-foot {
@@ -247,4 +284,183 @@
 
 .plaza-copy-submit {
   margin-top: 16px;
+}
+
+.plaza-cuisine-list {
+  overflow: hidden;
+  border-radius: var(--radius);
+}
+
+.plaza-cuisine-list .van-cell {
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.plaza-cuisine-list .van-cell.is-active {
+  border-color: var(--primary-dark);
+  background: var(--surface-soft);
+  color: var(--primary-dark);
+}
+
+/* ===== 浏览布局容器（分类 + 列表） ===== */
+.plaza-browse {
+  display: grid;
+  gap: 20px;
+}
+
+.plaza-main {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* ===== 移动端点单风：左侧分类 + 右侧紧凑列表 ===== */
+@media (max-width: 767px) {
+  .plaza-browse {
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .plaza-sidebar {
+    position: sticky;
+    top: 8px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    padding-bottom: 2px;
+  }
+
+  .plaza-sidebar .plaza-category-chip {
+    width: 100%;
+    min-height: 36px;
+    justify-content: center;
+    padding: 0 6px;
+    font-size: 12px;
+  }
+
+  .plaza-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .system-dish-card {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .system-dish-card .system-dish-card-media {
+    width: 92px;
+    height: 92px;
+    flex: 0 0 92px;
+    aspect-ratio: auto;
+  }
+
+  .system-dish-card .system-dish-card-fallback {
+    padding: 6px;
+    font-size: 13px;
+  }
+
+  .system-dish-card .system-dish-card-body {
+    flex: 1;
+    min-width: 0;
+    align-content: center;
+    padding: 10px 12px;
+  }
+
+  .system-dish-card .system-dish-card-title {
+    font-size: 14px;
+  }
+}
+
+/* ===== 搜索栏 + 筛选键 ===== */
+.plaza-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plaza-search-row .van-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.plaza-filter-btn {
+  position: relative;
+  display: grid;
+  width: 42px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.plaza-filter-btn.is-filtered {
+  border-color: var(--primary-dark);
+  background: var(--surface-soft);
+  color: var(--primary-dark);
+}
+
+.plaza-filter-btn.is-filtered::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e5484d;
+}
+
+/* ===== 筛选浮窗 ===== */
+.plaza-filter-sheet {
+  padding: calc(12px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+  background: var(--card);
+}
+
+.plaza-filter-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.plaza-filter-sheet-head h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.plaza-filter-close {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 18px;
+}
+
+.plaza-filter-group + .plaza-filter-group {
+  margin-top: 16px;
+}
+
+.plaza-filter-label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.plaza-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }

@@ -13,6 +13,9 @@ const familyStore = useFamilyStore()
 
 const showFamilyPopup = ref(false)
 
+// 广场列表从详情返回时保持滚动位置与筛选状态，仅缓存列表页。
+const cachedViews = ['SystemDishListView']
+
 const sectionLabel = computed(() => route.meta.label ?? '家庭私厨')
 const currentFamilyName = computed(() => familyStore.currentFamily?.name || '选择家庭')
 
@@ -65,20 +68,15 @@ if (!familyStore.loaded) {
             <span class="family-switcher-label">{{ currentFamilyName }}</span>
             <span class="family-switcher-caret" aria-hidden="true">⌄</span>
           </button>
-          <RouterLink
-            class="profile-link"
-            :to="{ name: 'profile' }"
-            :aria-label="`个人资料：${authStore.displayName || '我的'}`"
-          >
-            {{ authStore.displayName || '我的' }}
-          </RouterLink>
           <button class="logout-btn" type="button" @click="onLogout">退出</button>
         </div>
       </div>
     </header>
 
     <main class="main-content" :aria-label="sectionLabel">
-      <RouterView />
+      <KeepAlive :include="cachedViews">
+        <RouterView />
+      </KeepAlive>
     </main>
 
     <TabBar mode="mobile" />

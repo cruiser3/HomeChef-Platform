@@ -11,7 +11,8 @@ public interface DishService {
 
     DishResponse create(Long familyId, DishRequest request);
 
-    List<DishResponse> list(Long familyId, Long categoryId, String keyword, Boolean available);
+    List<DishResponse> list(Long familyId, Long categoryId, Long cuisineId, Integer caloriesMin,
+            Integer caloriesMax, String keyword, Boolean available);
 
     DishResponse getDetail(Long familyId, Long dishId);
 

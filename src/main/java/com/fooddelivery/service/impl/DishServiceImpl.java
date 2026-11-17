@@ -4,6 +4,7 @@ import com.fooddelivery.dto.DishCategoryRequest;
 import com.fooddelivery.dto.DishCategoryResponse;
 import com.fooddelivery.dto.DishRequest;
 import com.fooddelivery.dto.DishResponse;
+import com.fooddelivery.entity.Cuisine;
 import com.fooddelivery.entity.Dish;
 import com.fooddelivery.entity.DishCategory;
 import com.fooddelivery.entity.DishIngredient;
@@ -16,6 +17,7 @@ import com.fooddelivery.exception.ConflictException;
 import com.fooddelivery.exception.ForbiddenException;
 import com.fooddelivery.exception.ResourceNotFoundException;
 import com.fooddelivery.repository.CartItemRepository;
+import com.fooddelivery.repository.CuisineRepository;
 import com.fooddelivery.repository.DishCategoryRepository;
 import com.fooddelivery.repository.DishIngredientRepository;
 import com.fooddelivery.repository.DishRepository;
@@ -36,6 +38,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -47,6 +50,7 @@ public class DishServiceImpl implements DishService {
     private final DishIngredientRepository dishIngredientRepository;
     private final DishStepRepository dishStepRepository;
     private final DishCategoryRepository dishCategoryRepository;
+    private final CuisineRepository cuisineRepository;
     private final FamilyOrderItemRepository familyOrderItemRepository;
     private final CartItemRepository cartItemRepository;
     private final UserRepository userRepository;
@@ -60,6 +64,7 @@ public class DishServiceImpl implements DishService {
 
         validateDishRequest(request);
         validateCategory(familyId, request.getCategoryId());
+        validateCuisine(request.getCuisineId());
         List<DishRequest.DishStepRequest> steps = normalizeSteps(request.getSteps());
 
         Dish dish = Dish.builder()
@@ -68,7 +73,9 @@ public class DishServiceImpl implements DishService {
                 .description(request.getDescription())
                 .imageUrl(request.getImageUrl())
                 .categoryId(request.getCategoryId())
+                .cuisineId(request.getCuisineId())
                 .cookingMinutes(request.getCookingMinutes())
+                .calories(request.getCalories())
                 .price(request.getPrice())
                 .createdBy(creatorId)
                 .available(true)
@@ -85,7 +92,8 @@ public class DishServiceImpl implements DishService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<DishResponse> list(Long familyId, Long categoryId, String keyword, Boolean available) {
+    public List<DishResponse> list(Long familyId, Long categoryId, Long cuisineId, Integer caloriesMin,
+            Integer caloriesMax, String keyword, Boolean available) {
         currentUserService.requireMembership(familyId);
 
         List<Dish> dishes;
@@ -106,14 +114,29 @@ public class DishServiceImpl implements DishService {
             boolean target = available;
             dishes = dishes.stream().filter(d -> d.isAvailable() == target).toList();
         }
+        if (cuisineId != null) {
+            if (isUncategorized(cuisineId)) {
+                dishes = dishes.stream().filter(d -> d.getCuisineId() == null).toList();
+            } else {
+                dishes = dishes.stream().filter(d -> cuisineId.equals(d.getCuisineId())).toList();
+            }
+        }
+        // 卡路里区间过滤：左闭右开 [caloriesMin, caloriesMax)。
+        if (caloriesMin != null) {
+            dishes = dishes.stream().filter(d -> d.getCalories() != null && d.getCalories() >= caloriesMin).toList();
+        }
+        if (caloriesMax != null) {
+            dishes = dishes.stream().filter(d -> d.getCalories() != null && d.getCalories() < caloriesMax).toList();
+        }
 
         Map<Long, String> categoryNames = categoryNamesOf(familyId);
+        Map<Long, String> cuisineNames = cuisineNamesOf(dishes);
         Map<Long, String> creatorNames = creatorNamesOf(dishes);
 
         Map<Long, double[]> ratingStats = ratingStatsOf(familyId, dishes);
         return dishes.stream()
                 .map(dish -> {
-                    DishResponse response = toSummaryResponse(dish, categoryNames, creatorNames);
+                    DishResponse response = toSummaryResponse(dish, categoryNames, cuisineNames, creatorNames);
                     applyRating(response, ratingStats.get(dish.getId()));
                     return response;
                 })
@@ -140,13 +163,16 @@ public class DishServiceImpl implements DishService {
 
         validateDishRequest(request);
         validateCategory(familyId, request.getCategoryId());
+        validateCuisine(request.getCuisineId());
         List<DishRequest.DishStepRequest> steps = normalizeSteps(request.getSteps());
 
         dish.setName(request.getName().trim());
         dish.setDescription(request.getDescription());
         dish.setImageUrl(request.getImageUrl());
         dish.setCategoryId(request.getCategoryId());
+        dish.setCuisineId(request.getCuisineId());
         dish.setCookingMinutes(request.getCookingMinutes());
+        dish.setCalories(request.getCalories());
         dish.setPrice(request.getPrice());
         dish.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         Dish saved = dishRepository.save(dish);
@@ -285,6 +311,9 @@ public class DishServiceImpl implements DishService {
         if (request.getCookingMinutes() != null && request.getCookingMinutes() < 0) {
             throw new BadRequestException("Cooking minutes must be zero or positive");
         }
+        if (request.getCalories() != null && request.getCalories() < 0) {
+            throw new BadRequestException("Calories must be zero or positive");
+        }
         if (request.getIngredients() != null) {
             for (DishRequest.DishIngredientRequest ingredient : request.getIngredients()) {
                 if (ingredient == null || ingredient.getName() == null || ingredient.getName().isBlank()) {
@@ -338,6 +367,21 @@ public class DishServiceImpl implements DishService {
         }
     }
 
+    private void validateCuisine(Long cuisineId) {
+        if (cuisineId != null && !cuisineRepository.existsById(cuisineId)) {
+            throw new BadRequestException("Cuisine does not exist: " + cuisineId);
+        }
+    }
+
+    private boolean isUncategorized(Long cuisineId) {
+        if (cuisineId == null) {
+            return false;
+        }
+        return cuisineRepository.findById(cuisineId)
+                .map(c -> c.getSortNo() == Cuisine.UNCATEGORIZED_SORT_NO)
+                .orElse(false);
+    }
+
     private List<DishRequest.DishStepRequest> normalizeSteps(List<DishRequest.DishStepRequest> steps) {
         if (steps == null || steps.isEmpty()) {
             return List.of();
@@ -389,7 +433,10 @@ public class DishServiceImpl implements DishService {
                 .description(dish.getDescription())
                 .imageUrl(dish.getImageUrl())
                 .categoryId(dish.getCategoryId())
+                .cuisineId(dish.getCuisineId())
+                .cuisineName(cuisineNameOf(dish.getCuisineId()))
                 .cookingMinutes(dish.getCookingMinutes())
+                .calories(dish.getCalories())
                 .price(dish.getPrice())
                 .createdBy(dish.getCreatedBy())
                 .createdByName(creatorName)
@@ -414,7 +461,8 @@ public class DishServiceImpl implements DishService {
                 .build();
     }
 
-    private DishResponse toSummaryResponse(Dish dish, Map<Long, String> categoryNames, Map<Long, String> creatorNames) {
+    private DishResponse toSummaryResponse(Dish dish, Map<Long, String> categoryNames,
+            Map<Long, String> cuisineNames, Map<Long, String> creatorNames) {
         return DishResponse.builder()
                 .id(dish.getId())
                 .familyId(dish.getFamilyId())
@@ -423,7 +471,10 @@ public class DishServiceImpl implements DishService {
                 .imageUrl(dish.getImageUrl())
                 .categoryId(dish.getCategoryId())
                 .categoryName(dish.getCategoryId() == null ? null : categoryNames.get(dish.getCategoryId()))
+                .cuisineId(dish.getCuisineId())
+                .cuisineName(dish.getCuisineId() == null ? null : cuisineNames.get(dish.getCuisineId()))
                 .cookingMinutes(dish.getCookingMinutes())
+                .calories(dish.getCalories())
                 .price(dish.getPrice())
                 .createdBy(dish.getCreatedBy())
                 .createdByName(creatorNames.get(dish.getCreatedBy()))
@@ -445,6 +496,26 @@ public class DishServiceImpl implements DishService {
     private Map<Long, String> categoryNamesOf(Long familyId) {
         return dishCategoryRepository.findByFamilyIdOrderBySortNoAsc(familyId).stream()
                 .collect(Collectors.toMap(DishCategory::getId, DishCategory::getName));
+    }
+
+    private String cuisineNameOf(Long cuisineId) {
+        if (cuisineId == null) {
+            return null;
+        }
+        return cuisineRepository.findById(cuisineId).map(Cuisine::getName).orElse(null);
+    }
+
+    private Map<Long, String> cuisineNamesOf(List<Dish> dishes) {
+        List<Long> cuisineIds = dishes.stream()
+                .map(Dish::getCuisineId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (cuisineIds.isEmpty()) {
+            return Map.of();
+        }
+        return cuisineRepository.findAllById(cuisineIds).stream()
+                .collect(Collectors.toMap(Cuisine::getId, Cuisine::getName));
     }
 
     private Map<Long, String> creatorNamesOf(List<Dish> dishes) {

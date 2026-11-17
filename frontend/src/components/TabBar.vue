@@ -33,9 +33,9 @@ defineProps({
           <path d="m3.5 10 8.5-7 8.5 7" />
           <path d="M5.5 9v11h13V9M9.5 20v-6h5v6" />
         </template>
-        <template v-else-if="item.icon === 'kitchen'">
-          <path d="M4 10h16v10H4zM6 10V6h12v4M8 6V4m8 2V4" />
-          <path d="M8 14h8" />
+        <template v-else-if="item.icon === 'order'">
+          <path d="M6 3h12v18H6z" />
+          <path d="M9 8h6M9 12h6M9 16h3" />
         </template>
         <template v-else-if="item.icon === 'cart'">
           <path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 1.9-1.4L22 8H6" />

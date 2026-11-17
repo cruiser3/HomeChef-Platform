@@ -33,9 +33,13 @@ public class DishController {
     public ResponseEntity<List<DishResponse>> list(
             @RequestHeader(name = "X-Family-Id", required = false) Long familyId,
             @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long cuisineId,
+            @RequestParam(required = false) Integer caloriesMin,
+            @RequestParam(required = false) Integer caloriesMax,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean available) {
-        return ResponseEntity.ok(dishService.list(requireFamilyId(familyId), categoryId, keyword, available));
+        return ResponseEntity.ok(dishService.list(
+                requireFamilyId(familyId), categoryId, cuisineId, caloriesMin, caloriesMax, keyword, available));
     }
 
     @GetMapping("/{dishId}")

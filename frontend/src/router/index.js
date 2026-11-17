@@ -53,7 +53,7 @@ const orderRoutes = [
     path: 'orders',
     name: 'orders',
     component: () => import('../views/OrderListView.vue'),
-    meta: { label: '厨房', requiresAuth: true, requiresFamily: true },
+    meta: { label: '订单', requiresAuth: true, requiresFamily: true },
   },
   {
     path: 'orders/:id',
@@ -77,7 +77,7 @@ const familyRoutes = [
     path: 'family',
     name: 'family',
     component: () => import('../views/FamilyView.vue'),
-    meta: { label: '家庭', requiresAuth: true, requiresFamily: true },
+    meta: { label: '我的家庭', requiresAuth: true, requiresFamily: true },
   },
 ]
 
@@ -85,13 +85,19 @@ const profileRoutes = [
   {
     path: 'profile',
     name: 'profile',
-    component: () => import('../views/ProfileView.vue'),
+    component: () => import('../views/MeView.vue'),
     meta: { label: '我的', requiresAuth: true },
+  },
+  {
+    path: 'profile/account',
+    name: 'profile-account',
+    component: () => import('../views/ProfileView.vue'),
+    meta: { label: '个人资料', requiresAuth: true },
   },
 ]
 
 const moduleRoutes = mainNavigation
-  .filter((item) => !['dishes', 'plaza', 'cart', 'kitchen', 'shopping', 'family'].includes(item.name))
+  .filter((item) => !['dishes', 'plaza', 'cart', 'kitchen', 'shopping', 'profile'].includes(item.name))
   .map((item) => ({
     path: item.path.slice(1),
     name: item.name,
@@ -136,6 +142,13 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+  scrollBehavior(to, from, savedPosition) {
+    // 浏览器前进/后退（有历史位置）时恢复；其余（应用内 push，如进入详情页）滚到顶部。
+    if (savedPosition) {
+      return savedPosition
+    }
+    return { top: 0 }
+  },
 })
 
 router.beforeEach(createAuthGuard())

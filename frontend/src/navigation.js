@@ -16,9 +16,9 @@ export const mainNavigation = [
   {
     name: 'kitchen',
     path: '/orders',
-    label: '厨房',
+    label: '订单',
     description: '查看订单与备菜进度',
-    icon: 'kitchen',
+    icon: 'order',
   },
   {
     name: 'cart',
@@ -35,10 +35,10 @@ export const mainNavigation = [
     icon: 'list',
   },
   {
-    name: 'family',
-    path: '/family',
-    label: '家庭',
-    description: '查看当前家庭与成员',
-    icon: 'family',
+    name: 'profile',
+    path: '/profile',
+    label: '我的',
+    description: '个人资料与家庭管理',
+    icon: 'user',
   },
 ]

@@ -12,9 +12,12 @@ public interface SystemDishService {
 
     List<SystemDishCategoryResponse> listCategories();
 
-    List<SystemDishSummaryResponse> list(Long categoryId, String keyword);
+    List<SystemDishSummaryResponse> list(Long categoryId, Long cuisineId, Integer caloriesMin, Integer caloriesMax,
+            String keyword);
 
     SystemDishDetailResponse getDetail(Long id);
+
+    SystemDishDetailResponse setCuisine(Long id, Long cuisineId);
 
     DishResponse copyToFamily(Long familyId, Long id, CopyToFamilyRequest request);
 }

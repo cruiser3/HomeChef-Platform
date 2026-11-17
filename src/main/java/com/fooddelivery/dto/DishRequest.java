@@ -22,8 +22,13 @@ public class DishRequest {
 
     private Long categoryId;
 
+    private Long cuisineId;
+
     @Min(value = 0, message = "Cooking minutes must be zero or positive")
     private Integer cookingMinutes;
+
+    @Min(value = 0, message = "Calories must be zero or positive")
+    private Integer calories;
 
     @NotNull(message = "Price is required")
     @DecimalMin(value = "0.00", message = "Price must be zero or positive")

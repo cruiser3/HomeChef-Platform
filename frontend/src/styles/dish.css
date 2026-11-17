@@ -54,6 +54,10 @@
   display: none;
 }
 
+.dish-categories + .dish-categories {
+  margin-top: 8px;
+}
+
 .dish-category-chip {
   display: inline-flex;
   flex: 0 0 auto;
@@ -497,6 +501,22 @@
   overflow: hidden;
 }
 
+.dish-calorie-field {
+  display: grid;
+  gap: 8px;
+}
+
+.dish-calorie-field .van-field {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.dish-calorie-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .dish-edit-actions {
   margin-top: 6px;
 }
@@ -851,4 +871,182 @@
 
 .review-submit {
   margin-top: 16px;
+}
+
+/* ===== 浏览布局容器（分类 + 列表） ===== */
+.dish-browse {
+  display: grid;
+  gap: 20px;
+}
+
+.dish-main {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* ===== 移动端点单风：左侧分类 + 右侧紧凑列表 ===== */
+@media (max-width: 767px) {
+  .dish-browse {
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .dish-sidebar {
+    position: sticky;
+    top: 8px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    padding-bottom: 2px;
+  }
+
+  .dish-sidebar .dish-category-chip {
+    width: 100%;
+    min-height: 36px;
+    justify-content: center;
+    padding: 0 6px;
+    font-size: 12px;
+  }
+
+  .dish-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  /* 菜品卡片：左图右文横条 */
+  .dish-card {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .dish-card .dish-card-media {
+    width: 92px;
+    height: 92px;
+    flex: 0 0 92px;
+    aspect-ratio: auto;
+  }
+
+  .dish-card .dish-card-fallback {
+    padding: 6px;
+    font-size: 13px;
+  }
+
+  .dish-card .dish-card-add {
+    right: 6px;
+    bottom: 6px;
+    width: 26px;
+    height: 26px;
+    font-size: 14px;
+  }
+
+  .dish-card .dish-card-badge {
+    top: 6px;
+    left: 6px;
+    padding: 2px 7px;
+    font-size: 10px;
+  }
+
+  .dish-card .dish-card-body {
+    flex: 1;
+    min-width: 0;
+    align-content: center;
+    padding: 10px 12px;
+  }
+
+  .dish-card .dish-card-title {
+    font-size: 14px;
+  }
+}
+
+/* ===== 搜索栏 + 筛选键 ===== */
+.dish-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dish-search-row .van-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.dish-filter-btn {
+  position: relative;
+  display: grid;
+  width: 42px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.dish-filter-btn.is-filtered {
+  border-color: var(--primary-dark);
+  background: var(--surface-soft);
+  color: var(--primary-dark);
+}
+
+.dish-filter-btn.is-filtered::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e5484d;
+}
+
+/* ===== 筛选浮窗 ===== */
+.dish-filter-sheet {
+  padding: calc(12px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+  background: var(--card);
+}
+
+.dish-filter-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.dish-filter-sheet-head h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.dish-filter-close {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 18px;
+}
+
+.dish-filter-group + .dish-filter-group {
+  margin-top: 16px;
+}
+
+.dish-filter-label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.dish-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }

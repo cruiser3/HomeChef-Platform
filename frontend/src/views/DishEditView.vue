@@ -5,8 +5,12 @@ import { showToast } from 'vant'
 import {
   createDish, updateDish, getDish, listDishCategories, createDishCategory,
 } from '../api/dish'
+import { listCuisines, createCuisine } from '../api/cuisine'
 import { uploadFile } from '../api/upload'
-import { parseRecipe } from '../api/ai'
+import { parseRecipe, analyzeCalories as analyzeDishCalories } from '../api/ai'
+
+// 「未分类」是后端虚拟分类（sort_no=1001），不能手动选择，编辑下拉需排除。
+const UNCATEGORIZED_SORT_NO = 1001
 
 const route = useRoute()
 const router = useRouter()
@@ -22,7 +26,10 @@ const form = reactive({
   imageUrl: '',
   categoryId: null,
   categoryName: '',
+  cuisineId: null,
+  cuisineName: '',
   cookingMinutes: '',
+  calories: '',
   price: '',
   ingredients: [],
   steps: [],
@@ -33,6 +40,13 @@ const showCategoryPicker = ref(false)
 const showCategoryCreate = ref(false)
 const creatingCategory = ref(false)
 const newCategoryName = ref('')
+
+const cuisines = ref([])
+const showCuisinePicker = ref(false)
+const showCuisineCreate = ref(false)
+const creatingCuisine = ref(false)
+const newCuisineName = ref('')
+const aiAnalyzingCalories = ref(false)
 
 const unitOptions = ['适量', '少许', 'g', 'kg', '斤', '两', 'ml', 'L', '个', '根', '只', '条', '块', '片', '张', '颗', '粒', '瓣', '朵', '棵', '把', '束', '勺', '匙', '杯', '碗', '瓶', '罐', '盒', '袋', '包', '头', '段', '滴', '撮', '盘']
 const showUnitPicker = ref(false)
@@ -69,6 +83,15 @@ async function loadCategories() {
   }
 }
 
+async function loadCuisines() {
+  try {
+    const all = await listCuisines()
+    cuisines.value = all.filter((c) => c.sortNo !== UNCATEGORIZED_SORT_NO)
+  } catch {
+    // 拦截器已提示
+  }
+}
+
 async function loadDetail() {
   loading.value = true
   try {
@@ -78,7 +101,10 @@ async function loadDetail() {
     form.imageUrl = dish.imageUrl || ''
     form.categoryId = dish.categoryId ?? null
     form.categoryName = dish.categoryName || ''
+    form.cuisineId = dish.cuisineId ?? null
+    form.cuisineName = dish.cuisineName || ''
     form.cookingMinutes = dish.cookingMinutes ?? ''
+    form.calories = dish.calories ?? ''
     form.price = dish.price ?? ''
     form.ingredients = (dish.ingredients || []).map((i) => ({
       name: i.name, amount: i.amount ?? '', unit: i.unit,
@@ -103,6 +129,49 @@ function onClearCategory() {
   form.categoryId = null
   form.categoryName = ''
   showCategoryPicker.value = false
+}
+
+function onSelectCuisine(cuisine) {
+  form.cuisineId = cuisine.id
+  form.cuisineName = cuisine.name
+  showCuisinePicker.value = false
+}
+
+function onClearCuisine() {
+  form.cuisineId = null
+  form.cuisineName = ''
+  showCuisinePicker.value = false
+}
+
+async function onSubmitNewCuisine() {
+  const name = newCuisineName.value.trim()
+  if (!name) {
+    showToast('请输入菜系名称')
+    return
+  }
+  if (name.length > 50) {
+    showToast('菜系名称不超过 50 字')
+    return
+  }
+  if (creatingCuisine.value) return
+
+  creatingCuisine.value = true
+  try {
+    const cuisine = await createCuisine({ name })
+    newCuisineName.value = ''
+    showCuisineCreate.value = false
+    showToast('菜系已创建')
+    await loadCuisines()
+    form.cuisineId = cuisine.id
+    form.cuisineName = cuisine.name
+    showCuisinePicker.value = false
+  } catch (error) {
+    if (error?.fieldErrors) {
+      showToast(Object.values(error.fieldErrors)[0] || '请检查填写内容')
+    }
+  } finally {
+    creatingCuisine.value = false
+  }
 }
 
 async function onSubmitNewCategory() {
@@ -286,6 +355,43 @@ async function onDishImageChange(event) {
   }
 }
 
+function buildCalorieIngredients() {
+  return form.ingredients
+    .filter((i) => i.name.trim())
+    .map((i) => {
+      const item = { name: i.name.trim() }
+      const amount = String(i.amount).trim()
+      if (amount !== '' && !Number.isNaN(Number(amount))) {
+        item.amount = Number(amount)
+      }
+      if (i.unit && i.unit.trim()) {
+        item.unit = i.unit.trim()
+      }
+      return item
+    })
+}
+
+async function onAnalyzeCalories() {
+  if (!form.name.trim()) {
+    showToast('请先填写菜名')
+    return
+  }
+  if (aiAnalyzingCalories.value) return
+  aiAnalyzingCalories.value = true
+  try {
+    const result = await analyzeDishCalories({
+      name: form.name.trim(),
+      ingredients: buildCalorieIngredients(),
+    })
+    form.calories = result.calories ?? ''
+    showToast(result.note || `已估算约 ${result.calories} 千卡`)
+  } catch {
+    // 拦截器已提示
+  } finally {
+    aiAnalyzingCalories.value = false
+  }
+}
+
 async function onSubmit() {
   if (!form.name.trim()) {
     showToast('请输入菜名')
@@ -313,7 +419,9 @@ async function onSubmit() {
     description: form.description.trim() || null,
     imageUrl: form.imageUrl.trim() || null,
     categoryId: form.categoryId,
+    cuisineId: form.cuisineId,
     cookingMinutes: form.cookingMinutes === '' ? null : Number(form.cookingMinutes),
+    calories: form.calories === '' ? null : Number(form.calories),
     price: Number(form.price),
     ingredients: ingredients.map((i) => ({
       name: i.name.trim(), amount: Number(i.amount), unit: i.unit.trim(),
@@ -341,6 +449,7 @@ async function onSubmit() {
 }
 
 loadCategories()
+loadCuisines()
 if (isEdit.value) {
   loadDetail()
 }
@@ -380,6 +489,15 @@ if (isEdit.value) {
         is-link
         @click="showCategoryPicker = true"
       />
+      <van-field
+        :model-value="form.cuisineName"
+        name="cuisine"
+        label="菜系"
+        placeholder="选择菜系（可选）"
+        readonly
+        is-link
+        @click="showCuisinePicker = true"
+      />
       <div class="dish-image-field">
         <van-field
           v-model="form.imageUrl"
@@ -417,6 +535,28 @@ if (isEdit.value) {
         label="耗时"
         placeholder="分钟（可选）"
       />
+      <div class="dish-calorie-field">
+        <van-field
+          v-model="form.calories"
+          name="calories"
+          type="digit"
+          label="卡路里"
+          placeholder="千卡（可选）"
+        />
+        <div class="dish-calorie-toolbar">
+          <van-button
+            size="small"
+            plain
+            type="primary"
+            icon="bulb-o"
+            :loading="aiAnalyzingCalories"
+            loading-text="分析中..."
+            @click="onAnalyzeCalories"
+          >
+            AI 分析卡路里
+          </van-button>
+        </div>
+      </div>
       <van-field
         v-model="form.price"
         name="price"
@@ -548,6 +688,39 @@ if (isEdit.value) {
           @click="onSubmitNewCategory"
         >
           创建分类
+        </van-button>
+      </div>
+    </van-popup>
+
+    <van-popup v-model:show="showCuisinePicker" round position="bottom">
+      <div class="dish-category-sheet">
+        <h2>选择菜系</h2>
+        <van-cell-group class="family-list">
+          <van-cell title="不设置菜系" @click="onClearCuisine" />
+          <van-cell
+            v-for="cuisine in cuisines"
+            :key="cuisine.id"
+            :title="cuisine.name"
+            @click="onSelectCuisine(cuisine)"
+          />
+        </van-cell-group>
+        <van-button block type="primary" plain @click="showCuisineCreate = true">新建菜系</van-button>
+      </div>
+    </van-popup>
+
+    <van-popup v-model:show="showCuisineCreate" round position="bottom">
+      <div class="dish-category-sheet">
+        <h2>新建菜系</h2>
+        <van-field v-model="newCuisineName" label="菜系名称" placeholder="例如：家常菜" maxlength="50" />
+        <van-button
+          class="dish-category-submit"
+          block
+          type="primary"
+          :loading="creatingCuisine"
+          loading-text="创建中..."
+          @click="onSubmitNewCuisine"
+        >
+          创建菜系
         </van-button>
       </div>
     </van-popup>

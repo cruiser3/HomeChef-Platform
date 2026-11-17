@@ -110,7 +110,7 @@ load()
 <template>
   <section class="order-page">
     <header class="order-head">
-      <p class="eyebrow">HOME CHEF · 厨房</p>
+      <p class="eyebrow">HOME CHEF · 订单</p>
       <h1>订单与备菜</h1>
     </header>
 

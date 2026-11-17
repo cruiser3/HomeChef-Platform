@@ -2,7 +2,8 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
-import { getSystemDish, copySystemDishToFamily } from '../api/systemDish'
+import { getSystemDish, copySystemDishToFamily, setSystemDishCuisine } from '../api/systemDish'
+import { listCuisines } from '../api/cuisine'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +16,10 @@ const copyPopup = ref(false)
 const price = ref('')
 const overrides = ref([])
 const copying = ref(false)
+
+const cuisines = ref([])
+const cuisinePopup = ref(false)
+const settingCuisine = ref(false)
 
 const needsAmount = computed(() =>
   (dish.value?.ingredients || []).filter(
@@ -47,7 +52,11 @@ async function loadDetail() {
 }
 
 function onBack() {
-  router.push({ name: 'plaza' })
+  if (window.history.length > 1) {
+    router.back()
+  } else {
+    router.push({ name: 'plaza' })
+  }
 }
 
 function openCopy() {
@@ -86,7 +95,48 @@ async function submitCopy() {
   }
 }
 
+async function loadCuisines() {
+  try {
+    cuisines.value = await listCuisines()
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+function openCuisine() {
+  cuisinePopup.value = true
+}
+
+async function onSelectCuisine(cuisine) {
+  if (settingCuisine.value) return
+  settingCuisine.value = true
+  try {
+    dish.value = await setSystemDishCuisine(dish.value.id, cuisine.id)
+    showToast('菜系已更新')
+    cuisinePopup.value = false
+  } catch {
+    // 拦截器已提示
+  } finally {
+    settingCuisine.value = false
+  }
+}
+
+async function onClearCuisine() {
+  if (settingCuisine.value) return
+  settingCuisine.value = true
+  try {
+    dish.value = await setSystemDishCuisine(dish.value.id, null)
+    showToast('菜系已清除')
+    cuisinePopup.value = false
+  } catch {
+    // 拦截器已提示
+  } finally {
+    settingCuisine.value = false
+  }
+}
+
 loadDetail()
+loadCuisines()
 </script>
 
 <template>
@@ -119,6 +169,7 @@ loadDetail()
         <h1>{{ dish.name }}</h1>
         <p class="dish-detail-meta">
           <span v-if="dish.categoryName">{{ dish.categoryName }}</span>
+          <span v-if="dish.cuisineName">{{ dish.cuisineName }}</span>
           <span v-if="dish.cookingMinutes != null">{{ dish.cookingMinutes }} 分钟</span>
           <span v-if="dish.calories != null">{{ dish.calories }} 千卡</span>
         </p>
@@ -127,6 +178,7 @@ loadDetail()
 
       <div class="dish-detail-actions">
         <van-button block type="primary" @click="openCopy">复制到我家</van-button>
+        <van-button block plain type="primary" @click="openCuisine">设置菜系</van-button>
       </div>
 
       <section v-if="dish.ingredients?.length" class="dish-detail-section">
@@ -196,6 +248,27 @@ loadDetail()
         <van-button class="plaza-copy-submit" block type="primary" :loading="copying" @click="submitCopy">
           复制
         </van-button>
+      </div>
+    </van-popup>
+
+    <van-popup v-model:show="cuisinePopup" round position="bottom">
+      <div class="plaza-copy-sheet">
+        <h2>设置菜系</h2>
+        <p class="plaza-copy-dish">{{ dish?.name }}</p>
+        <van-cell-group class="plaza-cuisine-list">
+          <van-cell
+            title="不设置菜系"
+            :class="{ 'is-active': dish?.cuisineId == null }"
+            @click="onClearCuisine"
+          />
+          <van-cell
+            v-for="cuisine in cuisines"
+            :key="cuisine.id"
+            :title="cuisine.name"
+            :class="{ 'is-active': dish?.cuisineId === cuisine.id }"
+            @click="onSelectCuisine(cuisine)"
+          />
+        </van-cell-group>
       </div>
     </van-popup>
   </section>

@@ -21,7 +21,10 @@ public class DishResponse {
     private String imageUrl;
     private Long categoryId;
     private String categoryName;
+    private Long cuisineId;
+    private String cuisineName;
     private Integer cookingMinutes;
+    private Integer calories;
     private BigDecimal price;
     private Long createdBy;
     private String createdByName;

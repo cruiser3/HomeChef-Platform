@@ -21,4 +21,6 @@ public interface SystemDishRepository extends JpaRepository<SystemDish, Long> {
     boolean existsBySourceTypeAndOriginalPath(String sourceType, String originalPath);
 
     Optional<SystemDish> findBySourceTypeAndOriginalPath(String sourceType, String originalPath);
+
+    List<SystemDish> findByCuisineIdIsNullAndAvailableTrueOrderByIdAsc();
 }

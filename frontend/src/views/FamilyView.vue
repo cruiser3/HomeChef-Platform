@@ -185,6 +185,10 @@ loadMyId()
 
 <template>
   <section class="family-page">
+    <button class="dish-back" type="button" @click="router.push({ name: 'profile' })">
+      <van-icon name="arrow-left" /> 返回我的
+    </button>
+
     <header class="family-head">
       <p class="eyebrow">HOME CHEF · 家庭</p>
       <h1>家庭空间</h1>

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import BaseCard from '../components/BaseCard.vue'
 import { getMyProfile, updateMyProfile } from '../api/user'
@@ -7,6 +8,7 @@ import { uploadFile } from '../api/upload'
 import { useAuthStore } from '../store/auth'
 import { PREFERENCES, RESTRICTIONS, ALLERGIES, CONDITIONS } from '../constants/dietary'
 
+const router = useRouter()
 const authStore = useAuthStore()
 
 const loading = ref(true)
@@ -223,8 +225,12 @@ load()
 
 <template>
   <section class="profile-page">
+    <button class="dish-back" type="button" @click="router.push({ name: 'profile' })">
+      <van-icon name="arrow-left" /> 返回我的
+    </button>
+
     <header class="profile-head">
-      <p class="eyebrow">HOME CHEF · 我的</p>
+      <p class="eyebrow">HOME CHEF · 个人资料</p>
       <h1>个人资料</h1>
       <p class="page-description">完善昵称、头像与饮食偏好，让家人更了解你的口味。</p>
     </header>

@@ -1,11 +1,14 @@
 package com.fooddelivery.controller;
 
+import com.fooddelivery.dto.AiCalorieRequest;
+import com.fooddelivery.dto.AiCalorieResponse;
 import com.fooddelivery.dto.AiCartAnalyzeRequest;
 import com.fooddelivery.dto.AiCartAnalyzeResponse;
 import com.fooddelivery.dto.AiRecipeParseRequest;
 import com.fooddelivery.dto.AiRecipeParseResponse;
 import com.fooddelivery.exception.AiServiceException;
 import com.fooddelivery.exception.BadRequestException;
+import com.fooddelivery.service.AiCalorieService;
 import com.fooddelivery.service.AiCartAnalyzeService;
 import com.fooddelivery.service.AiRecipeService;
 import jakarta.validation.Valid;
@@ -25,6 +28,7 @@ public class AiController {
 
     private final AiRecipeService aiRecipeService;
     private final AiCartAnalyzeService aiCartAnalyzeService;
+    private final AiCalorieService aiCalorieService;
 
     @Value("${app.ai.enabled:true}")
     private boolean aiEnabled;
@@ -48,5 +52,13 @@ public class AiController {
             throw new BadRequestException("X-Family-Id header is required");
         }
         return ResponseEntity.ok(aiCartAnalyzeService.analyzeCart(familyId, request));
+    }
+
+    @PostMapping("/analyze-calories")
+    public ResponseEntity<AiCalorieResponse> analyzeCalories(@Valid @RequestBody AiCalorieRequest request) {
+        if (!aiEnabled) {
+            throw new AiServiceException("AI 功能未启用");
+        }
+        return ResponseEntity.ok(aiCalorieService.analyzeCalories(request));
     }
 }

@@ -16,6 +16,8 @@ public class SystemDishSummaryResponse {
     private String coverImageUrl;
     private Long categoryId;
     private String categoryName;
+    private Long cuisineId;
+    private String cuisineName;
     private Integer cookingMinutes;
     private Integer difficulty;
     private Integer calories;

@@ -35,8 +35,14 @@ public class Dish {
     @Column(name = "category_id")
     private Long categoryId;
 
+    @Column(name = "cuisine_id")
+    private Long cuisineId;
+
     @Column(name = "cooking_minutes")
     private Integer cookingMinutes;
+
+    @Column(name = "calories")
+    private Integer calories;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;

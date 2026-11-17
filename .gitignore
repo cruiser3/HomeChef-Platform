@@ -34,3 +34,9 @@ uploads/
 AGENTS.md
 .github/modernize/
 .frontend/
+
+# ===== 开发过程文档 / 界面参考截图，仅本地留存，不随仓库分发 =====
+docs/
+screenshots/
+# howtocook/ 是 HowToCook 菜谱数据源的重复副本（后端导入只用 HowToCook/），不上传；HowToCook/ 必须随仓库保留（见上方说明）
+howtocook/

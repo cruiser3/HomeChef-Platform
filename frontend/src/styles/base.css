@@ -455,28 +455,6 @@ button {
   color: var(--danger);
 }
 
-.profile-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 38px;
-  max-width: 140px;
-  padding: 0 10px;
-  overflow: hidden;
-  border-radius: 10px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.profile-link:hover {
-  background: var(--surface-soft);
-  color: var(--primary-dark);
-}
-
 .family-sheet {
   padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
 }

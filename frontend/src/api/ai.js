@@ -9,3 +9,8 @@ export function parseRecipe(text) {
 export function analyzeCart(payload = {}) {
   return request.post('/ai/analyze-cart', payload, { timeout: 120000 })
 }
+
+// 卡路里估算耗时较长，覆盖默认超时。
+export function analyzeCalories(payload) {
+  return request.post('/ai/analyze-calories', payload, { timeout: 120000 })
+}

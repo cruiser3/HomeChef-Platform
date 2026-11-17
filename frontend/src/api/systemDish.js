@@ -15,3 +15,8 @@ export function getSystemDish(dishId) {
 export function copySystemDishToFamily(dishId, payload) {
   return request.post(`/system-dishes/${dishId}/copy-to-family`, payload)
 }
+
+export function setSystemDishCuisine(dishId, cuisineId) {
+  const params = cuisineId != null ? { cuisineId } : {}
+  return request.patch(`/system-dishes/${dishId}/cuisine`, null, { params })
+}

@@ -5,6 +5,7 @@ import com.fooddelivery.dto.DishResponse;
 import com.fooddelivery.dto.SystemDishCategoryResponse;
 import com.fooddelivery.dto.SystemDishDetailResponse;
 import com.fooddelivery.dto.SystemDishSummaryResponse;
+import com.fooddelivery.entity.Cuisine;
 import com.fooddelivery.entity.Dish;
 import com.fooddelivery.entity.DishCategory;
 import com.fooddelivery.entity.DishIngredient;
@@ -13,7 +14,9 @@ import com.fooddelivery.entity.SystemDish;
 import com.fooddelivery.entity.SystemDishCategory;
 import com.fooddelivery.entity.SystemDishIngredient;
 import com.fooddelivery.entity.SystemDishStep;
+import com.fooddelivery.exception.BadRequestException;
 import com.fooddelivery.exception.ResourceNotFoundException;
+import com.fooddelivery.repository.CuisineRepository;
 import com.fooddelivery.repository.DishIngredientRepository;
 import com.fooddelivery.repository.DishRepository;
 import com.fooddelivery.repository.DishStepRepository;
@@ -42,6 +45,7 @@ import java.util.stream.Collectors;
 public class SystemDishServiceImpl implements SystemDishService {
 
     private final SystemDishRepository systemDishRepository;
+    private final CuisineRepository cuisineRepository;
     private final SystemDishIngredientRepository systemDishIngredientRepository;
     private final SystemDishStepRepository systemDishStepRepository;
     private final SystemDishCategoryRepository systemDishCategoryRepository;
@@ -65,7 +69,8 @@ public class SystemDishServiceImpl implements SystemDishService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<SystemDishSummaryResponse> list(Long categoryId, String keyword) {
+    public List<SystemDishSummaryResponse> list(Long categoryId, Long cuisineId, Integer caloriesMin,
+            Integer caloriesMax, String keyword) {
         List<SystemDish> dishes;
         if (keyword != null && !keyword.isBlank()) {
             dishes = systemDishRepository.findByNameContainingIgnoreCaseAndAvailableTrueOrderByIdDesc(keyword.trim());
@@ -78,9 +83,25 @@ public class SystemDishServiceImpl implements SystemDishService {
             dishes = systemDishRepository.findByAvailableTrueOrderByIdDesc();
         }
 
+        if (cuisineId != null) {
+            if (isUncategorized(cuisineId)) {
+                dishes = dishes.stream().filter(d -> d.getCuisineId() == null).toList();
+            } else {
+                dishes = dishes.stream().filter(d -> cuisineId.equals(d.getCuisineId())).toList();
+            }
+        }
+        // 卡路里区间过滤：左闭右开 [caloriesMin, caloriesMax)。
+        if (caloriesMin != null) {
+            dishes = dishes.stream().filter(d -> d.getCalories() != null && d.getCalories() >= caloriesMin).toList();
+        }
+        if (caloriesMax != null) {
+            dishes = dishes.stream().filter(d -> d.getCalories() != null && d.getCalories() < caloriesMax).toList();
+        }
+
         Map<Long, String> categoryNames = categoryNamesOf(dishes);
+        Map<Long, String> cuisineNames = cuisineNamesOf(dishes);
         return dishes.stream()
-                .map(dish -> toSummaryResponse(dish, categoryNames))
+                .map(dish -> toSummaryResponse(dish, categoryNames, cuisineNames))
                 .toList();
     }
 
@@ -88,6 +109,16 @@ public class SystemDishServiceImpl implements SystemDishService {
     @Transactional(readOnly = true)
     public SystemDishDetailResponse getDetail(Long id) {
         return toDetailResponse(findAvailableSystemDish(id));
+    }
+
+    @Override
+    public SystemDishDetailResponse setCuisine(Long id, Long cuisineId) {
+        if (cuisineId != null && !cuisineRepository.existsById(cuisineId)) {
+            throw new BadRequestException("Cuisine does not exist: " + cuisineId);
+        }
+        SystemDish dish = findAvailableSystemDish(id);
+        dish.setCuisineId(cuisineId);
+        return toDetailResponse(systemDishRepository.save(dish));
     }
 
     @Override
@@ -109,7 +140,9 @@ public class SystemDishServiceImpl implements SystemDishService {
                 .description(systemDish.getDescription())
                 .imageUrl(systemDish.getCoverImageUrl())
                 .categoryId(familyCategory == null ? null : familyCategory.getId())
+                .cuisineId(systemDish.getCuisineId())
                 .cookingMinutes(systemDish.getCookingMinutes())
+                .calories(systemDish.getCalories())
                 .price(request.getPrice())
                 .createdBy(creatorId)
                 .available(true)
@@ -209,7 +242,37 @@ public class SystemDishServiceImpl implements SystemDishService {
                 .collect(Collectors.toMap(SystemDishCategory::getId, SystemDishCategory::getName));
     }
 
-    private SystemDishSummaryResponse toSummaryResponse(SystemDish dish, Map<Long, String> categoryNames) {
+    private boolean isUncategorized(Long cuisineId) {
+        if (cuisineId == null) {
+            return false;
+        }
+        return cuisineRepository.findById(cuisineId)
+                .map(c -> c.getSortNo() == Cuisine.UNCATEGORIZED_SORT_NO)
+                .orElse(false);
+    }
+
+    private String cuisineNameOf(Long cuisineId) {
+        if (cuisineId == null) {
+            return null;
+        }
+        return cuisineRepository.findById(cuisineId).map(Cuisine::getName).orElse(null);
+    }
+
+    private Map<Long, String> cuisineNamesOf(List<SystemDish> dishes) {
+        List<Long> cuisineIds = dishes.stream()
+                .map(SystemDish::getCuisineId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (cuisineIds.isEmpty()) {
+            return Map.of();
+        }
+        return cuisineRepository.findAllById(cuisineIds).stream()
+                .collect(Collectors.toMap(Cuisine::getId, Cuisine::getName));
+    }
+
+    private SystemDishSummaryResponse toSummaryResponse(SystemDish dish, Map<Long, String> categoryNames,
+            Map<Long, String> cuisineNames) {
         return SystemDishSummaryResponse.builder()
                 .id(dish.getId())
                 .name(dish.getName())
@@ -217,6 +280,8 @@ public class SystemDishServiceImpl implements SystemDishService {
                 .coverImageUrl(dish.getCoverImageUrl())
                 .categoryId(dish.getCategoryId())
                 .categoryName(dish.getCategoryId() == null ? null : categoryNames.get(dish.getCategoryId()))
+                .cuisineId(dish.getCuisineId())
+                .cuisineName(dish.getCuisineId() == null ? null : cuisineNames.get(dish.getCuisineId()))
                 .cookingMinutes(dish.getCookingMinutes())
                 .difficulty(dish.getDifficulty())
                 .calories(dish.getCalories())
@@ -235,6 +300,8 @@ public class SystemDishServiceImpl implements SystemDishService {
                 .coverImageUrl(dish.getCoverImageUrl())
                 .categoryId(dish.getCategoryId())
                 .categoryName(categoryName)
+                .cuisineId(dish.getCuisineId())
+                .cuisineName(cuisineNameOf(dish.getCuisineId()))
                 .cookingMinutes(dish.getCookingMinutes())
                 .difficulty(dish.getDifficulty())
                 .calories(dish.getCalories())
@@ -273,7 +340,10 @@ public class SystemDishServiceImpl implements SystemDishService {
                 .imageUrl(saved.getImageUrl())
                 .categoryId(familyCategory == null ? null : familyCategory.getId())
                 .categoryName(familyCategory == null ? null : familyCategory.getName())
+                .cuisineId(saved.getCuisineId())
+                .cuisineName(cuisineNameOf(saved.getCuisineId()))
                 .cookingMinutes(saved.getCookingMinutes())
+                .calories(saved.getCalories())
                 .price(saved.getPrice())
                 .createdBy(saved.getCreatedBy())
                 .createdByName(creatorName)

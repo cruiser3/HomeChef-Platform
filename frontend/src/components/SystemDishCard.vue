@@ -24,7 +24,8 @@ defineProps({
     </div>
     <div class="system-dish-card-body">
       <h3 class="system-dish-card-title">{{ dish.name }}</h3>
-      <p v-if="dish.categoryName || dish.cookingMinutes != null" class="system-dish-card-meta">
+      <p v-if="dish.cuisineName || dish.categoryName || dish.cookingMinutes != null" class="system-dish-card-meta">
+        <span v-if="dish.cuisineName" class="system-dish-card-cuisine">{{ dish.cuisineName }}</span>
         <span v-if="dish.categoryName">{{ dish.categoryName }}</span>
         <span v-if="dish.cookingMinutes != null">{{ dish.cookingMinutes }} 分钟</span>
       </p>

@@ -24,6 +24,9 @@ public class SystemDish {
     @Column(name = "category_id")
     private Long categoryId;
 
+    @Column(name = "cuisine_id")
+    private Long cuisineId;
+
     @Column(nullable = false, length = 100)
     private String name;
 

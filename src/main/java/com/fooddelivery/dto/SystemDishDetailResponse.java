@@ -29,6 +29,13 @@ public class SystemDishDetailResponse {
     private String originalPath;
     private String sourceCommit;
     private String license;
+    private Long sourceFamilyId;
+    private Long publishedBy;
+    private String familyName;
+    private String publisherName;
+    private String publisherAvatarUrl;
+    private Double averageRating;
+    private Integer reviewCount;
     private List<IngredientItem> ingredients;
     private List<StepItem> steps;
 

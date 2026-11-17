@@ -4,8 +4,10 @@ import com.fooddelivery.dto.DishCategoryRequest;
 import com.fooddelivery.dto.DishCategoryResponse;
 import com.fooddelivery.dto.DishRequest;
 import com.fooddelivery.dto.DishResponse;
+import com.fooddelivery.dto.SystemDishDetailResponse;
 import com.fooddelivery.exception.BadRequestException;
 import com.fooddelivery.service.DishService;
+import com.fooddelivery.service.SystemDishService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +22,7 @@ import java.util.List;
 public class DishController {
 
     private final DishService dishService;
+    private final SystemDishService systemDishService;
 
     @PostMapping
     public ResponseEntity<DishResponse> create(
@@ -71,6 +74,15 @@ public class DishController {
             @PathVariable Long dishId) {
         dishService.delete(requireFamilyId(familyId), dishId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{dishId}/publish-to-square")
+    public ResponseEntity<SystemDishDetailResponse> publishToSquare(
+            @RequestHeader(name = "X-Family-Id", required = false) Long familyId,
+            @PathVariable Long dishId,
+            @RequestParam Long categoryId) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(systemDishService.publishToSquare(requireFamilyId(familyId), dishId, categoryId));
     }
 
     @GetMapping("/categories")

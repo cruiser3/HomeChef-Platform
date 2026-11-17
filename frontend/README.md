@@ -1,6 +1,13 @@
 # 家庭私厨前端
 
-基于 Vue 3、Vite、Vue Router 和 JavaScript 的单页应用。当前已完成阶段 0 工程初始化及阶段 1 基础布局；业务模块会按 `../docs/frontend/FRONTEND_DEVELOPMENT_ROADMAP.md` 分阶段实现。
+基于 Vue 3、Vite、Vue Router、Pinia、Vant 4 的单页应用，已实现完整的家庭私厨点单与饮食协作功能：
+
+- 认证与个人资料：登录（JWT）、健康档案与饮食偏好（过敏原、忌口、饮食限制、健康状况）
+- 家庭空间：创建 / 邀请码加入、成员与角色管理
+- 家庭菜品：菜品 / 分类 / 食材 / 制作步骤、上下架、按菜系 / 卡路里 / 关键字筛选、评论与回复
+- 美食广场：系统菜谱浏览 / 搜索 / 筛选、复制到我家
+- 购物车、家庭订单（逐菜品备菜状态、开饭）、采购清单
+- AI 助手「小铲」：多会话流式对话（SSE），以及菜谱解析、购物车分析、卡路里估算
 
 ## 开发
 
@@ -15,26 +22,10 @@ npm run dev
 
 `.env.development` 将 API 基础路径设为 `/api`，Vite 将 `/api/*` 转发到 `API_PROXY_TARGET`（默认 `http://127.0.0.1:8080`）。本机如需覆盖，可在被 Git 忽略的 `.env.development.local` 中设置；不要把数据库密码、JWT 密钥或其他凭据放入 `VITE_*` 变量或前端文件。
 
-## 构建
+## 构建与测试
 
 ```powershell
 npm test
 npm run build
 npm run preview
-```
-
-阶段一提供五个主导航、响应式布局、路由守卫骨架和通用展示组件，暂不连接业务接口。登录页面和真实 Token 管理属于阶段二。
-
-阶段二接入真实登录前，受保护导航默认会跳转到 `/login` 占位页。若要在本地只预览阶段一布局，可在浏览器开发者工具 Console 执行：
-
-```js
-localStorage.setItem('homechef.token', 'phase1-preview')
-location.reload()
-```
-
-此值仅用于展示框架，不是真实 JWT，也不会授予后端访问权限。清理预览状态：
-
-```js
-localStorage.removeItem('homechef.token')
-location.reload()
 ```

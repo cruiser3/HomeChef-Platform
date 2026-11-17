@@ -10,4 +10,6 @@ import java.util.List;
 public interface SystemDishStepRepository extends JpaRepository<SystemDishStep, Long> {
 
     List<SystemDishStep> findByDishIdOrderByStepNoAsc(Long dishId);
+
+    void deleteByDishId(Long dishId);
 }

@@ -10,4 +10,6 @@ import java.util.List;
 public interface SystemDishIngredientRepository extends JpaRepository<SystemDishIngredient, Long> {
 
     List<SystemDishIngredient> findByDishIdOrderBySortNoAsc(Long dishId);
+
+    void deleteByDishId(Long dishId);
 }

@@ -18,6 +18,8 @@ public interface SystemDishRepository extends JpaRepository<SystemDish, Long> {
 
     List<SystemDish> findByNameContainingIgnoreCaseAndAvailableTrueOrderByIdDesc(String keyword);
 
+    List<SystemDish> findBySourceTypeAndAvailableTrueOrderByIdDesc(String sourceType);
+
     boolean existsBySourceTypeAndOriginalPath(String sourceType, String originalPath);
 
     Optional<SystemDish> findBySourceTypeAndOriginalPath(String sourceType, String originalPath);

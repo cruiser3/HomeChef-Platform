@@ -21,4 +21,12 @@ public class SystemDishSummaryResponse {
     private Integer cookingMinutes;
     private Integer difficulty;
     private Integer calories;
+    private String sourceType;
+    private Long sourceFamilyId;
+    private Long publishedBy;
+    private String familyName;
+    private String publisherName;
+    private String publisherAvatarUrl;
+    private Double averageRating;
+    private Integer reviewCount;
 }

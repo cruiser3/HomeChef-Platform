@@ -13,13 +13,17 @@ import com.fooddelivery.entity.SystemDishStep;
 import com.fooddelivery.entity.User;
 import com.fooddelivery.exception.ForbiddenException;
 import com.fooddelivery.exception.ResourceNotFoundException;
+import com.fooddelivery.repository.CuisineRepository;
 import com.fooddelivery.repository.DishIngredientRepository;
 import com.fooddelivery.repository.DishRepository;
 import com.fooddelivery.repository.DishStepRepository;
+import com.fooddelivery.repository.FamilyRepository;
 import com.fooddelivery.repository.SystemDishCategoryRepository;
 import com.fooddelivery.repository.SystemDishIngredientRepository;
 import com.fooddelivery.repository.SystemDishRepository;
+import com.fooddelivery.repository.SystemDishReviewRepository;
 import com.fooddelivery.repository.SystemDishStepRepository;
+import com.fooddelivery.repository.UserRepository;
 import com.fooddelivery.service.impl.SystemDishServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,14 +50,18 @@ import static org.mockito.Mockito.when;
 class SystemDishServiceImplTest {
 
     @Mock private SystemDishRepository systemDishRepository;
+    @Mock private CuisineRepository cuisineRepository;
     @Mock private SystemDishIngredientRepository systemDishIngredientRepository;
     @Mock private SystemDishStepRepository systemDishStepRepository;
+    @Mock private SystemDishReviewRepository systemDishReviewRepository;
     @Mock private SystemDishCategoryRepository systemDishCategoryRepository;
     @Mock private FamilyDishCategoryResolver familyDishCategoryResolver;
     @Mock private DishRepository dishRepository;
     @Mock private DishIngredientRepository dishIngredientRepository;
     @Mock private DishStepRepository dishStepRepository;
     @Mock private CurrentUserService currentUserService;
+    @Mock private FamilyRepository familyRepository;
+    @Mock private UserRepository userRepository;
 
     @InjectMocks
     private SystemDishServiceImpl service;
@@ -65,7 +73,7 @@ class SystemDishServiceImplTest {
         when(systemDishRepository.findByAvailableTrueOrderByIdDesc()).thenReturn(List.of(dish));
         when(systemDishCategoryRepository.findAllById(List.of(10L))).thenReturn(List.of(category));
 
-        List<SystemDishSummaryResponse> result = service.list(null, null);
+        List<SystemDishSummaryResponse> result = service.list(null, null, null, null, null, null);
 
         assertEquals(1, result.size());
         assertEquals("红烧肉", result.get(0).getName());

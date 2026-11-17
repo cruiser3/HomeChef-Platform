@@ -39,3 +39,7 @@ export function deleteDishCategory(categoryId) {
 export function deleteDish(dishId) {
   return request.delete(`/dishes/${dishId}`)
 }
+
+export function publishDishToSquare(dishId, categoryId) {
+  return request.post(`/dishes/${dishId}/publish-to-square`, null, { params: { categoryId } })
+}

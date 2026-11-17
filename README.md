@@ -9,11 +9,11 @@
 - 认证与用户：注册、登录（JWT）、个人资料与饮食偏好（过敏原、医疗状况、饮食限制）。
 - 家庭协作：创建家庭、邀请码加入、成员与角色管理，家庭数据严格隔离。
 - 家庭菜品：菜品、分类、食材、制作步骤的增删改查与上下架，支持按菜系、卡路里区间、关键字筛选。
-- 美食广场：内置 HowToCook 开源菜谱数据源，浏览/搜索/筛选系统菜谱，一键复制到自家。
+- 美食广场：内置 HowToCook 开源菜谱数据源，浏览/搜索/筛选系统菜谱，一键复制到自家；支持菜品评论、回复与星级评价。
 - 点单与备菜：按「用户 + 家庭」隔离的个人购物车、家庭订单、逐菜品备菜状态与开饭管理。
 - 采购清单：记录备菜时实际缺少的食材并标记已购。
-- 菜品评论：家庭菜品评价与回复。
-- AI 辅助（可选）：菜谱文本解析、购物车分析、卡路里估算、菜系自动分类，基于本地 Ollama。
+- 菜品评论：家庭菜品评价与回复；广场菜品评论、回复与星级聚合。
+- AI 辅助（可选）：菜谱文本解析、购物车分析、卡路里估算、菜系自动分类，以及「小铲」多会话流式对话助手（悬浮球 + 全屏对话 + 会话历史 + 设置面板），支持本地 Ollama 或用户自配 API（DeepSeek / Kimi / OpenAI / 自定义，OpenAI 兼容）。
 
 ## 技术栈
 
@@ -23,7 +23,7 @@
 - Spring Web、Spring Data JPA、Spring Validation、Spring Security + JWT（jjwt 0.12.5）
 - MySQL（Connector/J 9.7.0）+ Flyway 数据库迁移
 - Lombok
-- AI：本地 Ollama（默认模型 `qwen2.5:7b`，可配置关闭）
+- AI：本地 Ollama（默认模型 `qwen2.5:7b`，可配置关闭）；「小铲」对话助手支持多服务商（Ollama / DeepSeek / Kimi / OpenAI / 自定义，OpenAI 兼容）
 
 ### 前端
 
@@ -47,7 +47,7 @@
 │   └── util/             # 工具类
 ├── src/main/resources/
 │   ├── application.properties
-│   └── db/migration/     # Flyway 迁移脚本（V1～V17）
+│   └── db/migration/     # Flyway 迁移脚本（V1～V21）
 ├── src/test/java/        # 单元测试
 ├── frontend/             # Vue 3 + Vite 前端
 │   ├── src/api/          # 后端接口封装
@@ -73,8 +73,9 @@
 | 购物车 | `/api/cart` | 查询、添加、修改数量、删除、清空 |
 | 家庭订单 | `/api/family-orders` | 提交、列表、详情、取消、开始备菜、开饭、逐菜品备菜状态 |
 | 采购清单 | `/api/shopping-list` | 记录缺少食材、更新、标记已购、删除 |
-| 系统菜谱 | `/api/system-dishes` | 分类、列表（分类/菜系/卡路里/关键字筛选）、详情、设置菜系、复制到家庭、AI 菜系分类 |
-| AI | `/api/ai` | 解析菜谱、分析购物车、估算卡路里 |
+| 系统菜谱 | `/api/system-dishes` | 分类、列表（分类/菜系/卡路里/关键字筛选）、详情、设置菜系、复制到家庭、AI 菜系分类、评论与回复、星级聚合 |
+| AI | `/api/ai` | 解析菜谱、分析购物车、估算卡路里；「小铲」流式对话（SSE）与多会话管理 |
+| AI 配置 | `/api/ai/config` | 获取/保存/重置「小铲」模型来源、API Key（AES 加密）与角色设定 |
 | 上传 | `/api/upload` | 图片上传 |
 | 用户 | `/api/users` | 获取/更新个人资料与饮食偏好 |
 
@@ -91,9 +92,15 @@ app.system-dish.import.howtocook-path=./HowToCook
 
 首次启动会把 `HowToCook/dishes` 下的 Markdown 菜谱解析入库，封面图复制到 `uploads/`；重复启动跳过已存在项，不会重复导入。
 
+广场系统菜谱支持评论、回复与星级评价：登录用户可发表/回复评论并匿名，星级按顶级评论评分实时聚合均值展示（与小家菜品一致）。
+
 ## AI 功能（可选）
 
-AI 能力通过本地 [Ollama](https://ollama.com) 提供，默认关闭不影响主体功能：
+AI 能力分两部分，不启用也不影响主体点单 / 备菜 / 采购功能。
+
+### 基础 AI（菜谱解析、购物车分析、卡路里估算、菜系分类）
+
+通过本地 [Ollama](https://ollama.com) 提供：
 
 ```properties
 app.ai.enabled=true
@@ -102,6 +109,15 @@ app.ai.ollama.model=qwen2.5:7b
 ```
 
 启用前需本地运行 Ollama 并拉取对应模型（如 `ollama pull qwen2.5:7b`）；若未运行 Ollama，请将 `app.ai.enabled` 设为 `false` 以避免 AI 接口报错。
+
+### 「小铲」多会话对话助手
+
+前端悬浮球 + 全屏对话，支持多会话历史与独立角色设定。模型来源可在前端设置面板自配，支持预设 **Ollama / DeepSeek / Kimi / OpenAI** 或「自定义」（统一映射为 OpenAI 兼容协议）；用户配置的 API Key 由后端用 AES-256-GCM 加密后落库，接口返回时脱敏。
+
+```properties
+# 用户自配 API Key 的加密密钥（经 SHA-256 派生 256-bit 密钥；生产环境务必覆盖为强随机值）
+app.ai.config.encryption-key=${AI_CONFIG_ENCRYPTION_KEY:local-dev-key-change-me}
+```
 
 ## 本地运行
 
@@ -165,12 +181,13 @@ npm run build
 
 ## 数据库与配置
 
-- 数据库：MySQL，Flyway 以 `src/main/resources/db/migration` 下 V1～V17 脚本管理表结构与演进，Hibernate `ddl-auto=validate` 校验。
+- 数据库：MySQL，Flyway 以 `src/main/resources/db/migration` 下 V1～V21 脚本管理表结构与演进，Hibernate `ddl-auto=validate` 校验。
 - `JWT_SECRET`：必需的 JWT 签名密钥；本地可按启动步骤临时生成，不要把真实密钥提交到版本库。
 - `DB_PASSWORD`：必需的 MySQL 应用账号密码。
 - `DB_URL`、`DB_USERNAME`：可选，默认分别为 `jdbc:mysql://127.0.0.1:3306/homechef_platform` 和 `homechef_app`。
 - `PORT`：后端端口，可选，默认 `8080`。
 - `API_PROXY_TARGET`：前端开发代理目标，可选，默认 `http://127.0.0.1:8080`。
+- `AI_CONFIG_ENCRYPTION_KEY`：可选，「小铲」用户自配 API Key 的加密密钥，默认 `local-dev-key-change-me`，生产环境务必覆盖为强随机值。
 
 ## Docker 部署
 

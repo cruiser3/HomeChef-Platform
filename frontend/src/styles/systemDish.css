@@ -175,6 +175,21 @@
   font-weight: 650;
 }
 
+.system-dish-card-rating {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.system-dish-card-source {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
 .system-dish-card-foot {
   display: flex;
   flex-wrap: wrap;
@@ -374,6 +389,30 @@
   .system-dish-card .system-dish-card-title {
     font-size: 14px;
   }
+}
+
+/* ===== 推荐 / 最新 双 Tab ===== */
+.plaza-tabs {
+  display: flex;
+  gap: 10px;
+}
+
+.plaza-tab {
+  min-height: 38px;
+  padding: 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.plaza-tab.is-active {
+  border-color: var(--primary-dark);
+  background: var(--primary-dark);
+  color: #fff;
 }
 
 /* ===== 搜索栏 + 筛选键 ===== */

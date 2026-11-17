@@ -31,12 +31,14 @@ public class SystemDishController {
 
     @GetMapping("/api/system-dishes")
     public ResponseEntity<List<SystemDishSummaryResponse>> list(
+            @RequestParam(required = false, defaultValue = "recommend") String tab,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long cuisineId,
             @RequestParam(required = false) Integer caloriesMin,
             @RequestParam(required = false) Integer caloriesMax,
             @RequestParam(required = false) String keyword) {
-        return ResponseEntity.ok(systemDishService.list(categoryId, cuisineId, caloriesMin, caloriesMax, keyword));
+        return ResponseEntity.ok(systemDishService.list(
+                tab, categoryId, cuisineId, caloriesMin, caloriesMax, keyword));
     }
 
     @GetMapping("/api/system-dishes/{id}")
@@ -63,6 +65,19 @@ public class SystemDishController {
     @PostMapping("/api/system-dishes/classify-cuisines")
     public ResponseEntity<CuisineClassifyResult> classifyCuisines() {
         return ResponseEntity.ok(cuisineClassifyService.classifyCuisines());
+    }
+
+    @PatchMapping("/api/system-dishes/{id}/availability")
+    public ResponseEntity<SystemDishDetailResponse> changeAvailability(
+            @PathVariable Long id,
+            @RequestParam boolean available) {
+        return ResponseEntity.ok(systemDishService.setAvailability(id, available));
+    }
+
+    @DeleteMapping("/api/system-dishes/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        systemDishService.withdrawPublish(id);
+        return ResponseEntity.noContent().build();
     }
 
     private Long requireFamilyId(Long familyId) {

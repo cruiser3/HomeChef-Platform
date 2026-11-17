@@ -12,6 +12,7 @@ const dishes = ref([])
 const categories = ref([])
 const cuisines = ref([])
 const keyword = ref('')
+const activeTab = ref('recommend')
 const activeCategoryId = ref(null)
 const activeCuisineId = ref(null)
 const activeCaloriesMin = ref(null)
@@ -76,7 +77,7 @@ async function loadCuisines() {
 async function loadDishes() {
   loading.value = true
   loadError.value = false
-  const params = {}
+  const params = { tab: activeTab.value }
   if (activeCategoryId.value != null) params.categoryId = activeCategoryId.value
   if (activeCuisineId.value != null) params.cuisineId = activeCuisineId.value
   if (activeCaloriesMin.value != null) params.caloriesMin = activeCaloriesMin.value
@@ -92,6 +93,12 @@ async function loadDishes() {
 }
 
 function onSearch() {
+  loadDishes()
+}
+
+function onSelectTab(tab) {
+  if (activeTab.value === tab) return
+  activeTab.value = tab
   loadDishes()
 }
 
@@ -174,6 +181,24 @@ loadDishes()
       <p class="eyebrow">HOME CHEF · 广场</p>
       <h1>美食广场</h1>
       <p class="page-description">浏览系统菜谱库，把喜欢的菜复制到我家。</p>
+      <div class="plaza-tabs" role="tablist">
+        <button
+          type="button"
+          class="plaza-tab"
+          :class="{ 'is-active': activeTab === 'recommend' }"
+          @click="onSelectTab('recommend')"
+        >
+          美食推荐
+        </button>
+        <button
+          type="button"
+          class="plaza-tab"
+          :class="{ 'is-active': activeTab === 'latest' }"
+          @click="onSelectTab('latest')"
+        >
+          最新
+        </button>
+      </div>
       <div class="plaza-search-row">
         <van-search
           v-model="keyword"

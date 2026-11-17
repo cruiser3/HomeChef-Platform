@@ -17,6 +17,11 @@ import java.time.ZoneOffset;
 @Builder
 public class SystemDish {
 
+    /** 系统菜谱：来自 HowToCook 等数据源的导入。 */
+    public static final String SOURCE_TYPE_HOWTOCOOK = "HOWTOCOOK";
+    /** 用户发布：来自家庭菜品快照。 */
+    public static final String SOURCE_TYPE_FAMILY = "FAMILY";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -45,7 +50,7 @@ public class SystemDish {
 
     @Column(name = "source_type", nullable = false, length = 30)
     @Builder.Default
-    private String sourceType = "HOWTOCOOK";
+    private String sourceType = SOURCE_TYPE_HOWTOCOOK;
 
     @Column(name = "source_url", length = 500)
     private String sourceUrl;
@@ -58,6 +63,12 @@ public class SystemDish {
 
     @Column(length = 50)
     private String license;
+
+    @Column(name = "source_family_id")
+    private Long sourceFamilyId;
+
+    @Column(name = "published_by")
+    private Long publishedBy;
 
     @Column(name = "is_available", nullable = false)
     @Builder.Default

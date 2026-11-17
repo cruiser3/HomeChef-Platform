@@ -2,7 +2,8 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
-import { getDish, changeDishAvailability, deleteDish } from '../api/dish'
+import { getDish, changeDishAvailability, deleteDish, publishDishToSquare } from '../api/dish'
+import { listSystemDishCategories } from '../api/systemDish'
 import { listDishReviews, createDishReview, createDishReply, updateDishReview, deleteDishReview } from '../api/review'
 import { uploadFile } from '../api/upload'
 import ReviewItem from '../components/ReviewItem.vue'
@@ -22,6 +23,11 @@ const cartStore = useCartStore()
 const familyStore = useFamilyStore()
 const myId = ref(null)
 const deleting = ref(false)
+
+const publishPopup = ref(false)
+const publishCategories = ref([])
+const publishCategoryId = ref(null)
+const publishing = ref(false)
 
 const reviews = ref([])
 const reviewsLoading = ref(false)
@@ -163,6 +169,36 @@ async function onDelete() {
     // 拦截器已提示（含被历史订单引用 409）
   } finally {
     deleting.value = false
+  }
+}
+
+async function openPublish() {
+  publishCategoryId.value = null
+  publishPopup.value = true
+  if (!publishCategories.value.length) {
+    try {
+      publishCategories.value = await listSystemDishCategories()
+    } catch {
+      // 拦截器已提示
+    }
+  }
+}
+
+async function submitPublish() {
+  if (publishing.value || !dish.value) return
+  if (!publishCategoryId.value) {
+    showToast('请选择广场分类')
+    return
+  }
+  publishing.value = true
+  try {
+    await publishDishToSquare(dish.value.id, publishCategoryId.value)
+    showToast('已发布到广场')
+    publishPopup.value = false
+  } catch {
+    // 拦截器已提示
+  } finally {
+    publishing.value = false
   }
 }
 
@@ -320,6 +356,7 @@ loadMyId()
           加入购物车
         </van-button>
         <van-button v-if="canManage" block @click="onEdit">编辑菜品</van-button>
+        <van-button block plain type="primary" @click="openPublish">发布到广场</van-button>
         <van-button v-if="canManage" block :loading="toggling" @click="onToggleAvailability">
           {{ dish.available ? '下架菜品' : '重新上架' }}
         </van-button>
@@ -430,6 +467,33 @@ loadMyId()
         </van-cell>
         <van-button class="review-submit" block type="primary" :loading="reviewSubmitting" @click="submitReview">
           {{ editingReview ? '保存' : (replyTarget ? '提交回复' : '提交评价') }}
+        </van-button>
+      </div>
+    </van-popup>
+
+    <van-popup v-model:show="publishPopup" round position="bottom">
+      <div class="plaza-copy-sheet">
+        <h2>发布到广场</h2>
+        <p class="plaza-copy-dish">{{ dish?.name }}</p>
+        <p class="plaza-copy-hint">请选择发布到广场的分类，再次发布会覆盖更新之前的广场副本。</p>
+        <van-cell-group class="plaza-cuisine-list">
+          <van-cell
+            v-for="category in publishCategories"
+            :key="category.id"
+            :title="category.name"
+            :class="{ 'is-active': publishCategoryId === category.id }"
+            @click="publishCategoryId = category.id"
+          />
+        </van-cell-group>
+        <van-button
+          class="plaza-copy-submit"
+          block
+          type="primary"
+          :loading="publishing"
+          :disabled="!publishCategoryId"
+          @click="submitPublish"
+        >
+          发布
         </van-button>
       </div>
     </van-popup>

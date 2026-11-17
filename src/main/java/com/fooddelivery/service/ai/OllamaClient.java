@@ -11,8 +11,18 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * 对本地 Ollama 的唯一 HTTP 封装。所有 AI 调用都经由此类，隔离 Ollama 原生接口细节，
@@ -25,7 +35,9 @@ public class OllamaClient {
 
     private final RestClient restClient;
     private final String model;
+    private final String baseUrl;
     private final ObjectMapper objectMapper;
+    private final HttpClient httpClient;
 
     public OllamaClient(
             @Value("${app.ai.ollama.base-url:http://localhost:11434}") String baseUrl,
@@ -34,6 +46,7 @@ public class OllamaClient {
             RestClient.Builder builder,
             ObjectMapper objectMapper) {
         this.model = model;
+        this.baseUrl = baseUrl;
         this.objectMapper = objectMapper;
 
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
@@ -43,6 +56,10 @@ public class OllamaClient {
         this.restClient = builder
                 .baseUrl(baseUrl)
                 .requestFactory(requestFactory)
+                .build();
+
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(timeoutMs))
                 .build();
     }
 
@@ -78,6 +95,64 @@ public class OllamaClient {
             return root.path("message").path("content").asText();
         } catch (Exception e) {
             log.warn("Ollama chat failed: {}", e.getMessage());
+            throw new AiServiceException("AI 服务不可用，请确认 Ollama 已启动后重试");
+        }
+    }
+
+    /**
+     * 单条聊天消息（角色 + 内容），用于多轮对话。
+     */
+    public record ChatMessage(String role, String content) {}
+
+    /**
+     * 以流式方式调用 Ollama /api/chat（stream=true），逐 token 回调纯文本增量。
+     *
+     * @param messages 完整消息序列（含 system / user / assistant）
+     * @param onToken  每收到一个增量 token 时回调
+     * @throws AiServiceException Ollama 不可用或请求失败时
+     */
+    public void streamChat(List<ChatMessage> messages, Consumer<String> onToken) {
+        try {
+            List<Map<String, Object>> messageList = messages.stream()
+                    .map(m -> Map.<String, Object>of("role", m.role(), "content", m.content()))
+                    .toList();
+            Map<String, Object> requestBody = Map.of(
+                    "model", model,
+                    "stream", true,
+                    "keep_alive", "30m",
+                    "messages", messageList
+            );
+            String json = objectMapper.writeValueAsString(requestBody);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/chat"))
+                    .timeout(Duration.ofMinutes(5))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(json))
+                    .build();
+
+            HttpResponse<InputStream> response =
+                    httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.isBlank()) {
+                        continue;
+                    }
+                    try {
+                        JsonNode node = objectMapper.readTree(line);
+                        String content = node.path("message").path("content").asText(null);
+                        if (content != null && !content.isEmpty()) {
+                            onToken.accept(content);
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to parse Ollama stream chunk: {}", line);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Ollama stream chat failed: {}", e.getMessage());
             throw new AiServiceException("AI 服务不可用，请确认 Ollama 已启动后重试");
         }
     }

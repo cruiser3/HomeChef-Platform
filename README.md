@@ -177,7 +177,7 @@ cd frontend
 npm run build
 ```
 
-`src/test/` 现有 4 个测试类（邮箱规范化、采购清单校验、系统菜谱服务、HowToCook 解析器）。
+`src/test/` 现有 4 个测试类、共 19 例（邮箱规范化、采购清单校验、系统菜谱服务、HowToCook 解析器）。
 
 ## 数据库与配置
 
@@ -195,7 +195,14 @@ npm run build
 
 ```bash
 docker build -t homechef-backend .
-docker run -e JWT_SECRET=... -e DB_PASSWORD=... -p 8080:8080 homechef-backend
+docker run -e JWT_SECRET=... -e DB_PASSWORD=... \
+  -e DB_URL=jdbc:mysql://host.docker.internal:3306/homechef_platform?serverTimezone=UTC \
+  -v "$(pwd)/uploads:/app/uploads" \
+  -v "$(pwd)/HowToCook:/app/HowToCook" \
+  -p 8080:8080 homechef-backend
 ```
 
-> 镜像仅包含后端；如需美食广场菜谱，请将 `HowToCook/` 目录挂载进容器，或关闭 `app.system-dish.import.enabled`。
+> 说明：
+> - 镜像仅包含后端。`JWT_SECRET`、`DB_PASSWORD` 为必需环境变量；`DB_URL`、`DB_USERNAME`、`PORT`、`AI_CONFIG_ENCRYPTION_KEY` 可选（默认值见 `application.properties`）。
+> - 容器内默认 `DB_URL` 指向 `127.0.0.1`（容器自身）；访问宿主机 MySQL 需显式覆盖 `DB_URL`（macOS/Windows 用 `host.docker.internal`，Linux 可用 `--network host` 或宿主机内网 IP）。
+> - `uploads/` 卷持久化上传图片与系统菜谱封面；`HowToCook/` 卷提供美食广场菜谱数据源，缺失则首次导入自动跳过（或关闭 `app.system-dish.import.enabled`）。
